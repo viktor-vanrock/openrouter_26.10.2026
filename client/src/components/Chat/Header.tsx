@@ -1,7 +1,14 @@
 import { memo, useContext, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useRecoilValue } from 'recoil';
-import { Settings, X } from 'lucide-react';
-import { ThemeContext, useMediaQuery } from '@librechat/client';
+import { BookOpen, Megaphone, Settings, X } from 'lucide-react';
+import {
+  OGDialog,
+  OGDialogContent,
+  OGDialogTitle,
+  ThemeContext,
+  useMediaQuery,
+} from '@librechat/client';
 import { getConfigDefaults, PermissionTypes, Permissions } from 'librechat-data-provider';
 import ModelSelector from './Menus/Endpoints/ModelSelector';
 import { useGetStartupConfig } from '~/data-provider';
@@ -12,6 +19,7 @@ import { TemporaryChat } from './TemporaryChat';
 import AddMultiConvo from './AddMultiConvo';
 import { useHasAccess } from '~/hooks';
 import { cn } from '~/utils';
+import { hasDevelopingCookie } from '~/utils/developingCookie';
 import store from '~/store';
 import { OpenrouterButton } from '../OpenrouterButton';
 import { CurrentKeyProvider } from '~/Providers';
@@ -22,6 +30,67 @@ import { SettingOpenrouterKeyButton } from '../SettingOpenrouterKeyButton';
 import { MobileAccordionPanel } from './MobileAccordionPanel';
 
 const defaultInterface = getConfigDefaults().interface;
+const GUIDE_VISITED_KEY = 'chatrouter:guide-visited';
+
+function GuideHeaderActions() {
+  const [newsOpen, setNewsOpen] = useState(false);
+  const [guideVisited, setGuideVisited] = useState(() => {
+    try {
+      return window.localStorage.getItem(GUIDE_VISITED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const markGuideVisited = () => {
+    setGuideVisited(true);
+    try {
+      window.localStorage.setItem(GUIDE_VISITED_KEY, '1');
+    } catch {
+      // Browsers may disable local storage; the current page still updates.
+    }
+  };
+
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <Link
+        to="/guide"
+        onClick={markGuideVisited}
+        className={cn(
+          'inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600',
+          guideVisited
+            ? 'border-border-light bg-surface-primary text-text-primary hover:bg-surface-hover'
+            : 'guide-button-unvisited border-red-700 bg-red-700 text-white shadow-md shadow-red-900/20 hover:bg-red-800',
+        )}
+        aria-label="Как пользоваться ChatRouter"
+      >
+        <BookOpen className="h-4 w-4" aria-hidden="true" />
+        <span className="hidden lg:inline">Как пользоваться ChatRouter</span>
+        <span className="lg:hidden">Руководство</span>
+        {!guideVisited && (
+          <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+            Новое
+          </span>
+        )}
+      </Link>
+      <button
+        type="button"
+        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-border-light bg-surface-primary px-3 text-sm font-semibold text-text-primary transition-colors hover:bg-surface-hover"
+        aria-label="Что нового"
+        onClick={() => setNewsOpen(true)}
+      >
+        <Megaphone className="h-4 w-4" aria-hidden="true" />
+        <span className="hidden sm:inline">Что нового</span>
+      </button>
+      <OGDialog open={newsOpen} onOpenChange={setNewsOpen}>
+        <OGDialogContent className="max-w-sm">
+          <OGDialogTitle>Что нового</OGDialogTitle>
+          <p className="mt-3 text-sm font-normal text-text-secondary">Новостей пока нет.</p>
+        </OGDialogContent>
+      </OGDialog>
+    </div>
+  );
+}
 
 function Header() {
   const { data: startupConfig } = useGetStartupConfig();
@@ -52,12 +121,14 @@ function Header() {
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
   const sberLogoSrc = theme === 'dark' ? 'assets/sberLogoWhite.png' : 'assets/sberLogo.png';
   const isNeedShareMenu = false;
+  const showDevelopingActions = hasDevelopingCookie();
 
   return (
     <div className="via-presentation/70 md:from-presentation/80 md:via-presentation/50 2xl:from-presentation/0 absolute top-0 z-10 flex h-[52px] w-full items-center justify-between border-b bg-presentation from-presentation to-transparent p-2 font-semibold text-text-primary 2xl:via-transparent">
       <div className="hide-scrollbar flex w-full items-center justify-between gap-2 overflow-x-auto">
         <div className="mx-1 flex items-center">
           <OpenSidebar className="md:hidden" />
+          {isSmallScreen && showDevelopingActions && <GuideHeaderActions />}
           {!(navVisible && isSmallScreen) && (
             <div
               className={cn(
@@ -113,6 +184,7 @@ function Header() {
 
         {!isSmallScreen && (
           <div className="flex items-center gap-2">
+            {showDevelopingActions && <GuideHeaderActions />}
             <ExportAndShareMenu
               isSharedButtonEnabled={startupConfig?.sharedLinksEnabled ?? false}
             />

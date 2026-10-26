@@ -7,17 +7,23 @@ export function resolveMedia(html: string, media: Record<string, { url: string }
     /\b(src|poster)=(["'])media\/([a-f0-9]{24})\2/gi,
     (match, attribute, quote, id) => {
       const item = media[id.toLowerCase()];
-      return item ? `${attribute}=${quote}${escapeAttr(item.url)}${quote}` : match;
+      const url =
+        item?.url.startsWith('/api/guides/media/') && typeof window !== 'undefined'
+          ? `${window.location.origin}${item.url}`
+          : item?.url;
+      return url ? `${attribute}=${quote}${escapeAttr(url)}${quote}` : match;
     },
   );
 }
 
 export function buildSrcDoc(html: string, mediaOrigin?: string): string {
+  const imageOrigin =
+    mediaOrigin ?? (typeof window !== 'undefined' ? window.location.origin : undefined);
   const csp = [
     "default-src 'none'",
     "style-src 'unsafe-inline'",
-    `img-src data:${mediaOrigin ? ` ${mediaOrigin}` : ''}`,
-    `media-src${mediaOrigin ? ` ${mediaOrigin}` : " 'none'"}`,
+    `img-src data:${imageOrigin ? ` ${imageOrigin}` : ''}`,
+    `media-src${imageOrigin ? ` ${imageOrigin}` : " 'none'"}`,
     'font-src data:',
     "base-uri 'none'",
     "form-action 'none'",

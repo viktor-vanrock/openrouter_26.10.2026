@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
-const { GetObjectCommand } = require('@aws-sdk/client-s3');
-const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const jwt = require('jsonwebtoken');
 const { initializeS3 } = require('@librechat/api');
 
 const MEDIA_REF_PATTERN = /media\/([a-f0-9]{24})/gi;
@@ -30,6 +29,16 @@ function mediaIdsInHtml(html = '') {
   return [...html.matchAll(MEDIA_REF_PATTERN)].map((match) => match[1].toLowerCase());
 }
 
+function decodeUploadName(name) {
+  try {
+    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(Buffer.from(name, 'latin1'));
+    const cyrillicCount = (value) => (value.match(/[\u0400-\u04ff]/g) ?? []).length;
+    return cyrillicCount(decoded) > cyrillicCount(name) ? decoded : name;
+  } catch {
+    return name;
+  }
+}
+
 function getS3() {
   const s3 = initializeS3();
   const bucket = process.env.AWS_BUCKET_NAME;
@@ -37,22 +46,22 @@ function getS3() {
   return { s3, bucket };
 }
 
-async function signedMediaUrl(key) {
-  const { s3, bucket } = getS3();
-  return getSignedUrl(s3, new GetObjectCommand({ Bucket: bucket, Key: key }), {
+function signedMediaUrl(id) {
+  const token = jwt.sign({ guideMediaId: String(id) }, process.env.JWT_SECRET, {
     expiresIn: MEDIA_URL_TTL_SECONDS,
   });
+  return `/api/guides/media/${id}?token=${encodeURIComponent(token)}`;
 }
 
-function mediaDto(media, url) {
+function mediaDto(media) {
   const id = String(media._id);
   return {
     id,
     kind: media.kind,
-    name: media.originalName,
+    name: decodeUploadName(media.originalName),
     size: media.size,
     createdAt: media.createdAt,
-    url,
+    url: signedMediaUrl(id),
     snippet:
       media.kind === 'image'
         ? `<img src="media/${id}" alt="">`
@@ -65,21 +74,17 @@ async function mediaForHtml(html) {
   if (!ids.length) return { media: {}, mediaOrigin: undefined };
   const rows = await getGuideMediaModel()
     .find({ _id: { $in: ids } })
-    .select('_id key kind')
+    .select('_id kind')
     .lean();
-  const entries = await Promise.all(
-    rows.map(async (row) => [
-      String(row._id),
-      { url: await signedMediaUrl(row.key), kind: row.kind },
-    ]),
+  const media = Object.fromEntries(
+    rows.map((row) => [String(row._id), { url: signedMediaUrl(row._id), kind: row.kind }]),
   );
-  const media = Object.fromEntries(entries);
-  const firstUrl = Object.values(media)[0]?.url;
-  return { media, mediaOrigin: firstUrl ? new URL(firstUrl).origin : undefined };
+  return { media };
 }
 
 module.exports = {
   MEDIA_URL_TTL_SECONDS,
+  decodeUploadName,
   getGuideMediaModel,
   getS3,
   mediaDto,

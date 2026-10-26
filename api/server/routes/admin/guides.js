@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const fs = require('node:fs');
 const os = require('node:os');
 const crypto = require('node:crypto');
-const { PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { logger, SystemCapabilities } = require('@librechat/data-schemas');
 const { requireCapability } = require('~/server/middleware/roles/capabilities');
 const { requireJwtAuth } = require('~/server/middleware');
@@ -17,10 +17,10 @@ const {
 } = require('~/server/services/guides/sanitizeGuideHtml');
 const {
   getGuideMediaModel,
+  decodeUploadName,
   getS3,
   mediaDto,
   mediaForHtml,
-  signedMediaUrl,
 } = require('~/server/services/guides/media');
 
 const router = express.Router();
@@ -129,28 +129,9 @@ function receiveMediaFile(req, res, next) {
 
 router.get('/media', async (_req, res) => {
   const rows = await getGuideMediaModel().find({}).sort({ createdAt: -1 }).lean();
-  const signed = await Promise.allSettled(rows.map((row) => signedMediaUrl(row.key)));
-  const media = [];
-  let signingErrors = 0;
-  signed.forEach((result, index) => {
-    if (result.status === 'fulfilled') {
-      media.push(mediaDto(rows[index], result.value));
-    } else {
-      signingErrors += 1;
-      media.push(mediaDto(rows[index], ''));
-      logger.error(
-        `[guides] failed to sign media ${rows[index]._id}: ${result.reason?.message ?? 'unknown error'}`,
-      );
-    }
-  });
-  for (const item of media) {
-    if (!item.url) continue;
-    const url = new URL(item.url);
-    logger.info(`[guides] media signed URL ${url.host}${url.pathname}`);
-  }
-  const firstSigned = media.find((item) => item.url);
-  const mediaOrigin = firstSigned ? new URL(firstSigned.url).origin : undefined;
-  return res.set('Cache-Control', 'private, no-store').json({ media, mediaOrigin, signingErrors });
+  return res
+    .set('Cache-Control', 'private, no-store')
+    .json({ media: rows.map((row) => mediaDto(row)) });
 });
 
 router.post(
@@ -195,9 +176,6 @@ router.post(
         contentLength: req.file.size,
         bucketConfigured: Boolean(s3Bucket),
       });
-      stage = 'создание ссылки';
-      const url = await signedMediaUrl(uploadedKey);
-      const signedUrl = new URL(url);
       stage = 'загрузка в S3';
       await s3.send(
         new PutObjectCommand({
@@ -208,6 +186,21 @@ router.post(
           ContentType: detected.contentType,
         }),
       );
+      stage = 'проверка чтения из S3';
+      try {
+        const uploaded = await s3.send(
+          new GetObjectCommand({ Bucket: s3Bucket, Key: uploadedKey, Range: 'bytes=0-0' }),
+        );
+        if (!uploaded.Body) throw new Error('S3 returned an empty response body');
+        await uploaded.Body.transformToByteArray();
+      } catch (error) {
+        try {
+          await s3.send(new DeleteObjectCommand({ Bucket: s3Bucket, Key: uploadedKey }));
+        } catch (cleanupError) {
+          logMediaUploadError('удаление объекта после ошибки чтения из S3', cleanupError);
+        }
+        throw error;
+      }
       let media;
       stage = 'запись в MongoDB';
       try {
@@ -216,7 +209,7 @@ router.post(
           kind: detected.kind,
           contentType: detected.contentType,
           size: req.file.size,
-          originalName: req.file.originalname.slice(0, 200),
+          originalName: decodeUploadName(req.file.originalname).slice(0, 200),
           createdBy: req.user.id,
         });
       } catch (error) {
@@ -228,8 +221,7 @@ router.post(
         throw error;
       }
       logger.info(`[guides] media uploaded ${media._id} by ${req.user.id}`);
-      logger.info(`[guides] uploaded media signed URL ${signedUrl.host}${signedUrl.pathname}`);
-      return res.status(201).json({ media: mediaDto(media, url), mediaOrigin: signedUrl.origin });
+      return res.status(201).json({ media: mediaDto(media) });
     } catch (error) {
       logMediaUploadError(stage, error, s3Request);
       return res.status(500).json({ message: `Не удалось загрузить файл: ${stage}` });

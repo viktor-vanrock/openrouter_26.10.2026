@@ -2982,3 +2982,44 @@ html {
 .sharepoint-picker-bg {
   background-color: #f5f5f5;
 }
+
+.guide-button-unvisited {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.guide-button-unvisited::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 25%,
+    rgba(255, 255, 255, 0.08) 40%,
+    rgba(255, 255, 255, 0.45) 50%,
+    rgba(255, 255, 255, 0.08) 60%,
+    transparent 75%
+  );
+  transform: translateX(-120%);
+  animation: guide-button-shine 3.5s ease-in-out infinite;
+}
+
+@keyframes guide-button-shine {
+  0%,
+  30% {
+    transform: translateX(-120%);
+  }
+  70%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-button-unvisited::after {
+    animation: none;
+  }
+}

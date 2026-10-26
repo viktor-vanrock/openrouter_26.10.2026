@@ -1,16 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
+import { useSetRecoilState } from 'recoil';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@librechat/client';
 import GuideFrame from './GuideFrame';
 import type { GuideMediaMap } from './api';
 import { fetchGuide, fetchPublishedGuide } from './api';
+import store from '~/store';
 
 type Status = 'loading' | 'ready' | 'empty' | 'error';
 
 export default function GuideViewer({ mode }: { mode: 'published' | 'draft' }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const setSidebarExpanded = useSetRecoilState(store.sidebarExpanded);
   const [document, setDocument] = useState<{
     title: string;
     html: string;
@@ -18,6 +21,10 @@ export default function GuideViewer({ mode }: { mode: 'published' | 'draft' }) {
     mediaOrigin?: string;
   } | null>(null);
   const [status, setStatus] = useState<Status>('loading');
+
+  useLayoutEffect(() => {
+    if (mode === 'published') setSidebarExpanded(false);
+  }, [mode, setSidebarExpanded]);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,7 +62,7 @@ export default function GuideViewer({ mode }: { mode: 'published' | 'draft' }) {
   }, [id, mode]);
 
   return (
-    <div className="flex h-dvh w-screen flex-col bg-white">
+    <div className="flex h-dvh w-full flex-col bg-white">
       {mode === 'draft' && (
         <header className="flex h-12 shrink-0 items-center border-b border-gray-200 bg-white px-3">
           <Button

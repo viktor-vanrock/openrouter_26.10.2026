@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { LayoutDashboard, Users, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '~/utils';
+import { hasDevelopingCookie } from '~/utils/developingCookie';
 
 const NAV_ITEMS = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -11,6 +12,9 @@ const NAV_ITEMS = [
 
 export const AdminLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
+  const visibleNavItems = hasDevelopingCookie()
+    ? NAV_ITEMS
+    : NAV_ITEMS.filter((item) => item.to !== '/admin/guides');
 
   return (
     <div className="flex h-full flex-col overflow-hidden min-[701px]:flex-row">
@@ -41,7 +45,7 @@ export const AdminLayout = () => {
         </div>
 
         <nav className="flex-1 space-y-0.5 px-2">
-          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+          {visibleNavItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
@@ -88,7 +92,7 @@ export const AdminLayout = () => {
           <ChevronLeft className="h-5 w-5" />
         </NavLink>
         <nav aria-label="Admin navigation" className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
-          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+          {visibleNavItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
