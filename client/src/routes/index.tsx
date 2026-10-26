@@ -25,6 +25,8 @@ import { AdminRoute } from './AdminRoute';
 import { AdminLayout } from '~/components/Admin/AdminLayout';
 import { AdminDashboard } from '~/components/Admin/pages/Dashboard';
 import { AdminUsers } from '~/components/Admin/pages/Users';
+import AdminGuides from '~/components/Admin/guides/AdminGuides';
+import GuideViewer from '~/components/Admin/guides/GuideViewer';
 
 const AuthLayout = () => (
   <AuthContextProvider>
@@ -42,6 +44,11 @@ const loadInlinePromptsView = () =>
 
 const loadSkillsView = () =>
   import('~/components/Skills/layouts/SkillsView').then((m) => ({
+    Component: m.default,
+  }));
+
+const loadGuideEditor = () =>
+  import('~/components/Admin/guides/GuideEditor').then((m) => ({
     Component: m.default,
   }));
 
@@ -121,6 +128,8 @@ export const router = createBrowserRouter(
               children: [
                 { index: true, element: <AdminDashboard /> },
                 { path: 'users', element: <AdminUsers /> },
+                { path: 'guides', element: <AdminGuides /> },
+                { path: 'guides/:id/edit', lazy: loadGuideEditor },
               ],
             },
           ],
@@ -136,6 +145,10 @@ export const router = createBrowserRouter(
             {
               path: 'c/:conversationId?',
               element: <ChatRoute />,
+            },
+            {
+              path: 'guide',
+              element: <GuideViewer mode="published" />,
             },
             {
               path: 'search',
@@ -186,6 +199,11 @@ export const router = createBrowserRouter(
               ),
             },
           ],
+        },
+        {
+          path: 'guide/preview/:id',
+          element: <AdminRoute />,
+          children: [{ index: true, element: <GuideViewer mode="draft" /> }],
         },
       ],
     },

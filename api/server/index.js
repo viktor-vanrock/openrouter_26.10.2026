@@ -1,8 +1,13 @@
 require('dotenv').config();
 const { applyPrototypeDevProfile } = require('./services/Prototypes/PrototypeDevProfile');
 try {
-  if (applyPrototypeDevProfile()) console.info('[Prototype] Optional local prototype service profile connected.');
-} catch { console.warn('[Prototype] Local prototype profile unavailable; continuing ordinary chat startup.'); }
+  if (applyPrototypeDevProfile())
+    console.info('[Prototype] Optional local prototype service profile connected.');
+} catch {
+  console.warn(
+    '[Prototype] Local prototype profile unavailable; continuing ordinary chat startup.',
+  );
+}
 const telemetry = require('./telemetry');
 const fs = require('fs');
 const path = require('path');
@@ -115,11 +120,18 @@ const startServer = async () => {
   const prototypeTransportEnabled = isEnabled(process.env.PROTOTYPE_TRANSPORT_ENABLED);
   let prototypeControlPlane;
   let prototypeModelProxy;
-  try { prototypeControlPlane = createPrototypeControlPlaneStartup({
-    enabled: prototypeTransportEnabled && !process.env.PROTOTYPE_MONGO_URI && appConfig.prototypeAgent?.enabled === true,
-    db,
-    mongoose,
-  }); } catch { logger.warn('[Prototype] Optional control plane is unavailable.'); }
+  try {
+    prototypeControlPlane = createPrototypeControlPlaneStartup({
+      enabled:
+        prototypeTransportEnabled &&
+        !process.env.PROTOTYPE_MONGO_URI &&
+        appConfig.prototypeAgent?.enabled === true,
+      db,
+      mongoose,
+    });
+  } catch {
+    logger.warn('[Prototype] Optional control plane is unavailable.');
+  }
   initializeFileStorage(appConfig);
   startExpiredFileSweep({ appConfig, loadAppConfig: getAppConfig });
   await runAsSystem(async () => {
@@ -155,19 +167,26 @@ const startServer = async () => {
   /* Middleware */
   app.use(metricsMiddleware);
   app.use(noIndex);
-  app.use(express.json({ limit: '3mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '3mb' }));
+  app.use(express.json({ limit: '6mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '6mb' }));
   app.use(handleJsonParseError);
   // Scoped bearer auth is independent of browser login. Preserve function JSON schemas before mongoSanitize.
   app.use('/api/prototype-model/v1', (req, res, next) => {
-    if (!prototypeModelProxy) return res.status(503).json({ error: { code: 'PROTOTYPE_SERVICE_UNAVAILABLE', retryable: false } });
+    if (!prototypeModelProxy)
+      return res
+        .status(503)
+        .json({ error: { code: 'PROTOTYPE_SERVICE_UNAVAILABLE', retryable: false } });
     return prototypeModelProxy.modelRouter(req, res, next);
   });
   // Existing HTTPS /api ingress carries authenticated worker requests in bearer mode.
   app.use('/api/internal/prototype-tokens', (req, res, next) => {
-    const { usesPrototypeBearerAuth } = require('./services/Prototypes/PrototypeControlPlaneStartup');
-    if (process.env.NODE_ENV !== 'production' || !usesPrototypeBearerAuth()) return res.sendStatus(404);
-    if (!prototypeModelProxy) return res.status(503).json({ error: { code: 'PROTOTYPE_SERVICE_UNAVAILABLE' } });
+    const {
+      usesPrototypeBearerAuth,
+    } = require('./services/Prototypes/PrototypeControlPlaneStartup');
+    if (process.env.NODE_ENV !== 'production' || !usesPrototypeBearerAuth())
+      return res.sendStatus(404);
+    if (!prototypeModelProxy)
+      return res.status(503).json({ error: { code: 'PROTOTYPE_SERVICE_UNAVAILABLE' } });
     return prototypeModelProxy.tokenRouter(req, res, next);
   });
   app.use('/internal/prototype-tokens', (req, res, next) => {
@@ -242,6 +261,7 @@ const startServer = async () => {
   app.use('/api/admin/new-users', routes.adminNewUsers);
   app.use('/api/admin/message-stats', routes.adminMessageStats);
   app.use('/api/admin/model-share', routes.adminModelShare);
+  app.use('/api/admin/guides', routes.adminGuides);
   if (logsRoutes) {
     const { requireAdmin } = pkg;
     app.use('/api/admin/logs', requireJwtAuth, requireAdmin, logsRoutes);
@@ -258,13 +278,18 @@ const startServer = async () => {
   app.use('/api/prototypes', routes.prototypes.jobs);
   if (prototypeTransportEnabled) {
     app.use('/api/internal/prototype-control/v2', (req, res, next) => {
-      const { usesPrototypeBearerAuth } = require('./services/Prototypes/PrototypeControlPlaneStartup');
-      if (process.env.NODE_ENV !== 'production' || !usesPrototypeBearerAuth()) return res.sendStatus(404);
-      if (!prototypeControlPlane) return res.status(503).json({ error: { code: 'PROTOTYPE_SERVICE_UNAVAILABLE' } });
+      const {
+        usesPrototypeBearerAuth,
+      } = require('./services/Prototypes/PrototypeControlPlaneStartup');
+      if (process.env.NODE_ENV !== 'production' || !usesPrototypeBearerAuth())
+        return res.sendStatus(404);
+      if (!prototypeControlPlane)
+        return res.status(503).json({ error: { code: 'PROTOTYPE_SERVICE_UNAVAILABLE' } });
       return prototypeControlPlane.router(req, res, next);
     });
     app.use('/internal/prototype-control/v2', (req, res, next) => {
-      if (!prototypeControlPlane) return res.status(503).json({ error: { code: 'PROTOTYPE_SERVICE_UNAVAILABLE' } });
+      if (!prototypeControlPlane)
+        return res.status(503).json({ error: { code: 'PROTOTYPE_SERVICE_UNAVAILABLE' } });
       return prototypeControlPlane.router(req, res, next);
     });
   }
@@ -283,6 +308,7 @@ const startServer = async () => {
   app.use('/api/roles', routes.roles);
   app.use('/api/agents', routes.agents);
   app.use('/api/banner', routes.banner);
+  app.use('/api/guides', routes.guides);
   app.use('/api/memories', routes.memories);
   app.use('/api/permissions', routes.accessPermissions);
 
@@ -351,75 +377,101 @@ const startServer = async () => {
       GenerationJobManager.configure(streamServices);
       GenerationJobManager.initialize();
 
-      const prototypeRuntimeEnabled = prototypeTransportEnabled && appConfig.prototypeAgent?.enabled === true;
+      const prototypeRuntimeEnabled =
+        prototypeTransportEnabled && appConfig.prototypeAgent?.enabled === true;
       if (prototypeRuntimeEnabled || process.env.PROTOTYPE_MODEL_PROXY_ENABLED === 'true') {
         let storeShutdownRegistered = false;
-        const stopPrototypeStartup = startOptionalPrototype({ logger, start: async () => {
-          let prototypeDb = db;
-          let prototypeMongoose = mongoose;
-          if (!prototypeRuntimeEnabled && !process.env.PROTOTYPE_MONGO_URI) {
-            throw new Error('PROTOTYPE_ADAPTER_REQUIRES_SEPARATE_STORE');
-          }
-          if (process.env.PROTOTYPE_MONGO_URI) {
-            const store = await openPrototypeStore();
-            prototypeMongoose = store.mongoose;
-            prototypeDb = { ...store.methods, flushPrototypeChatProjection: () => store.projection.flush() };
-            if (!storeShutdownRegistered) {
-              registerShutdownTask('prototype store', () => store.stop());
-              storeShutdownRegistered = true;
+        const stopPrototypeStartup = startOptionalPrototype({
+          logger,
+          start: async () => {
+            let prototypeDb = db;
+            let prototypeMongoose = mongoose;
+            if (!prototypeRuntimeEnabled && !process.env.PROTOTYPE_MONGO_URI) {
+              throw new Error('PROTOTYPE_ADAPTER_REQUIRES_SEPARATE_STORE');
             }
-            prototypeControlPlane = createPrototypeControlPlaneStartup({
-              enabled: true, db: prototypeDb, mongoose: prototypeMongoose,
-            });
-          }
-          const stopMonitor = prototypeRuntimeEnabled
-            ? prototypeAvailability.monitor(prototypeMongoose.connection.db.collection('prototypeavailability')) : () => {};
-          try {
-            const { createPrototypeModelProxyStartup } = require('./services/Prototypes/PrototypeModelProxyStartup');
-            const { createPrototypeServiceAuthenticator } = require('./services/Prototypes/PrototypeControlPlaneStartup');
-            const { runAsSystem } = require('@librechat/data-schemas');
-            prototypeModelProxy = await createPrototypeModelProxyStartup({ mongoose: prototypeMongoose,
-              authenticateService: createPrototypeServiceAuthenticator(),
-              getUserKeyValues: input => runAsSystem(async () => db.getUserKeyValues(input)),
-            });
-            prototypeControlPlane?.setModelTokenRouter(prototypeModelProxy?.tokenRouter);
-            if (!prototypeRuntimeEnabled) {
-              // Adapter-only rollout has no command intake, Redis, S3, heartbeat or generation admission.
-              try { await prototypeControlPlane?.startPrivateListener(); }
-              catch (error) { await prototypeControlPlane?.stopPrivateListener(); throw error; }
-              const stopAdapter = async () => {
-                await prototypeControlPlane?.stopPrivateListener();
-                prototypeModelProxy?.close(); prototypeModelProxy = null;
-                prototypeControlPlane?.setModelTokenRouter(undefined);
+            if (process.env.PROTOTYPE_MONGO_URI) {
+              const store = await openPrototypeStore();
+              prototypeMongoose = store.mongoose;
+              prototypeDb = {
+                ...store.methods,
+                flushPrototypeChatProjection: () => store.projection.flush(),
               };
-              registerShutdownTask('prototype model adapter', stopAdapter);
-              return { stop: stopAdapter };
+              if (!storeShutdownRegistered) {
+                registerShutdownTask('prototype store', () => store.stop());
+                storeShutdownRegistered = true;
+              }
+              prototypeControlPlane = createPrototypeControlPlaneStartup({
+                enabled: true,
+                db: prototypeDb,
+                mongoose: prototypeMongoose,
+              });
             }
-            const runtime = await startPrototypeTransport({
-              enabled: prototypeTransportEnabled,
-              appConfig,
-              db: prototypeDb,
-              mongoose: prototypeMongoose,
-              logger,
-              registerShutdownTask,
-              bindControlPlane: (transport) => {
-                prototypeControlPlane?.bindTransport(transport);
-                return () => prototypeControlPlane?.unbindTransport();
-              },
-              startPrivateListener: () => prototypeControlPlane?.startPrivateListener(),
-              stopPrivateListener: () => prototypeControlPlane?.stopPrivateListener(),
-            });
-            registerShutdownTask('prototype availability', stopMonitor);
-            if (prototypeModelProxy) registerShutdownTask('prototype model proxy', () => {
-              prototypeModelProxy?.close(); prototypeModelProxy = null;
-            });
-            return runtime;
-          } catch (error) {
-            prototypeModelProxy?.close(); prototypeModelProxy = null;
-            prototypeControlPlane?.setModelTokenRouter(undefined);
-            stopMonitor(); throw error;
-          }
-        } });
+            const stopMonitor = prototypeRuntimeEnabled
+              ? prototypeAvailability.monitor(
+                  prototypeMongoose.connection.db.collection('prototypeavailability'),
+                )
+              : () => {};
+            try {
+              const {
+                createPrototypeModelProxyStartup,
+              } = require('./services/Prototypes/PrototypeModelProxyStartup');
+              const {
+                createPrototypeServiceAuthenticator,
+              } = require('./services/Prototypes/PrototypeControlPlaneStartup');
+              const { runAsSystem } = require('@librechat/data-schemas');
+              prototypeModelProxy = await createPrototypeModelProxyStartup({
+                mongoose: prototypeMongoose,
+                authenticateService: createPrototypeServiceAuthenticator(),
+                getUserKeyValues: (input) => runAsSystem(async () => db.getUserKeyValues(input)),
+              });
+              prototypeControlPlane?.setModelTokenRouter(prototypeModelProxy?.tokenRouter);
+              if (!prototypeRuntimeEnabled) {
+                // Adapter-only rollout has no command intake, Redis, S3, heartbeat or generation admission.
+                try {
+                  await prototypeControlPlane?.startPrivateListener();
+                } catch (error) {
+                  await prototypeControlPlane?.stopPrivateListener();
+                  throw error;
+                }
+                const stopAdapter = async () => {
+                  await prototypeControlPlane?.stopPrivateListener();
+                  prototypeModelProxy?.close();
+                  prototypeModelProxy = null;
+                  prototypeControlPlane?.setModelTokenRouter(undefined);
+                };
+                registerShutdownTask('prototype model adapter', stopAdapter);
+                return { stop: stopAdapter };
+              }
+              const runtime = await startPrototypeTransport({
+                enabled: prototypeTransportEnabled,
+                appConfig,
+                db: prototypeDb,
+                mongoose: prototypeMongoose,
+                logger,
+                registerShutdownTask,
+                bindControlPlane: (transport) => {
+                  prototypeControlPlane?.bindTransport(transport);
+                  return () => prototypeControlPlane?.unbindTransport();
+                },
+                startPrivateListener: () => prototypeControlPlane?.startPrivateListener(),
+                stopPrivateListener: () => prototypeControlPlane?.stopPrivateListener(),
+              });
+              registerShutdownTask('prototype availability', stopMonitor);
+              if (prototypeModelProxy)
+                registerShutdownTask('prototype model proxy', () => {
+                  prototypeModelProxy?.close();
+                  prototypeModelProxy = null;
+                });
+              return runtime;
+            } catch (error) {
+              prototypeModelProxy?.close();
+              prototypeModelProxy = null;
+              prototypeControlPlane?.setModelTokenRouter(undefined);
+              stopMonitor();
+              throw error;
+            }
+          },
+        });
         registerShutdownTask('optional prototype startup', stopPrototypeStartup);
       }
 

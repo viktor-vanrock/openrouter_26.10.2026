@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Users, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '~/utils';
 
 const NAV_ITEMS = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/users', label: 'Users', icon: Users, end: false },
+  { to: '/admin/guides', label: 'Руководство к использованию', icon: BookOpen, end: false },
 ];
 
 export const AdminLayout = () => {

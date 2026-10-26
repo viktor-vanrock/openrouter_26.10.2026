@@ -38,6 +38,8 @@ import { createPrototypeEventModel } from './prototypeEvent';
 import { createPrototypeArtifactModel } from './prototypeArtifact';
 import { createPrototypeOutboxModel } from './prototypeOutbox';
 import { createPrototypeWorkerEventReceiptModel } from './prototypeWorkerEventReceipt';
+import { createGuidePageModel } from './guidePage';
+import { createGuideMediaModel } from './guideMedia';
 
 export { createPrototypeJobModel } from './prototypeJob';
 export { createPrototypeTurnModel } from './prototypeTurn';
@@ -90,5 +92,7 @@ export function createModels(mongoose: typeof import('mongoose')) {
     PrototypeArtifact: createPrototypeArtifactModel(mongoose),
     PrototypeOutbox: createPrototypeOutboxModel(mongoose),
     PrototypeWorkerEventReceipt: createPrototypeWorkerEventReceiptModel(mongoose),
+    GuidePage: createGuidePageModel(mongoose),
+    GuideMedia: createGuideMediaModel(mongoose),
   };
 }

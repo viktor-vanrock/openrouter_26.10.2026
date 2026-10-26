@@ -39,3 +39,5 @@ export { default as prototypeWorkerEventReceiptSchema } from './prototypeWorkerE
 
 export { default as prototypeGatewayExecutionSchema } from './prototypeGatewayExecution';
 export { default as prototypeGenerationSchema } from './prototypeGeneration';
+export { default as guidePageSchema } from './guidePage';
+export { default as guideMediaSchema } from './guideMedia';

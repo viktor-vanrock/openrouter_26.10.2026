@@ -11,6 +11,7 @@ const adminUserActivity = require('./admin/userActivity');
 const adminNewUsers = require('./admin/newUsers');
 const adminMessageStats = require('./admin/messageStats');
 const adminModelShare = require('./admin/modelShare');
+const adminGuides = require('./admin/guides');
 const endpoints = require('./endpoints');
 const staticRoute = require('./static');
 const messages = require('./messages');
@@ -37,10 +38,12 @@ const keys = require('./keys');
 const user = require('./user');
 const mcp = require('./mcp');
 const prototypes = require('./prototypes');
+const guides = require('./guides');
 
 module.exports = {
   mcp,
   prototypes,
+  guides,
   auth,
   adminAuth,
   adminConfig,
@@ -52,6 +55,7 @@ module.exports = {
   adminNewUsers,
   adminMessageStats,
   adminModelShare,
+  adminGuides,
   keys,
   apiKeys,
   user,

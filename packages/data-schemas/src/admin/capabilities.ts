@@ -40,6 +40,7 @@ export const SystemCapabilities = {
   /** Reserved — not yet enforced by any middleware. */
   READ_ASSISTANTS: 'read:assistants',
   MANAGE_ASSISTANTS: 'manage:assistants',
+  MANAGE_GUIDES: 'manage:guides',
 } as const;
 
 /**
@@ -213,6 +214,7 @@ export const CAPABILITY_CATEGORIES: CapabilityCategory[] = [
       SystemCapabilities.MANAGE_ASSISTANTS,
       SystemCapabilities.READ_ASSISTANTS,
       SystemCapabilities.MANAGE_MCP_SERVERS,
+      SystemCapabilities.MANAGE_GUIDES,
     ],
   },
   {

@@ -1,7 +1,8 @@
 import { memo, useCallback, lazy, Suspense } from 'react';
+import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRecoilValue } from 'recoil';
-import { SquarePen } from 'lucide-react';
+import { SquarePen, BookOpen } from 'lucide-react';
 import { QueryKeys, SystemRoles } from 'librechat-data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { Skeleton, Sidebar, Button, TooltipAnchor, ThemeSelector } from '@librechat/client';
@@ -178,6 +179,19 @@ function ExpandedPanel({
       <div className="mt-auto flex flex-col gap-1">
         <ThemeSelector returnThemeOnly />
         <DocumentationModal />
+        <TooltipAnchor
+          side="right"
+          description="Как пользоваться ChatRouter"
+          render={
+            <Link
+              to="/guide"
+              aria-label="Как пользоваться ChatRouter"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-active-alt hover:text-text-primary"
+            >
+              <BookOpen className="h-5 w-5" aria-hidden="true" />
+            </Link>
+          }
+        />
         {user?.role === SystemRoles.ADMIN && <AdminPanel />}
         <Suspense fallback={<Skeleton className="h-9 w-9 rounded-lg" />}>
           <AccountSettings collapsed />
