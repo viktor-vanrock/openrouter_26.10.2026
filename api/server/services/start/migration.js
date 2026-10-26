@@ -21,12 +21,21 @@ async function checkMigrations() {
   await ensureGuidePageIndexes(mongoose.connection);
   // Keep startup compatible with a workspace whose data-schemas package has not yet
   // been rebuilt: server code resolves that package from its generated dist files.
-  await mongoose.connection.db
-    .collection('guidemedias')
-    .createIndex({ createdAt: -1 }, { name: 'guide_media_created_at_desc' });
-  await mongoose.connection.db
-    .collection('guidemedias')
-    .createIndex({ key: 1 }, { name: 'key_1', unique: true });
+  const guideMediaCollection = mongoose.connection.db.collection('guidemedias');
+  const guideMediaExists = await mongoose.connection.db
+    .listCollections({ name: 'guidemedias' })
+    .hasNext();
+  const guideMediaIndexes = guideMediaExists
+    ? await guideMediaCollection.listIndexes().toArray()
+    : [];
+  if (
+    !guideMediaIndexes.some(
+      (index) => Object.keys(index.key).length === 1 && index.key.createdAt === -1,
+    )
+  ) {
+    await guideMediaCollection.createIndex({ createdAt: -1 });
+  }
+  await guideMediaCollection.createIndex({ key: 1 }, { name: 'key_1', unique: true });
   try {
     const agentMigrationResult = await checkAgentPermissionsMigration({
       mongoose,

@@ -1,5 +1,7 @@
 import Editor, { loader, type OnMount } from '@monaco-editor/react';
-import * as monaco from 'monaco-editor';
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
+import type { editor } from 'monaco-editor';
+import 'monaco-editor/esm/vs/basic-languages/html/html.contribution';
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import { forwardRef, useImperativeHandle, useRef } from 'react';
 
@@ -12,7 +14,7 @@ monacoGlobal.MonacoEnvironment = {
 };
 
 // Supply the bundled ESM instance to the loader. This prevents its default CDN loader.
-loader.config({ monaco });
+loader.config({ monaco: monaco as typeof import('monaco-editor') });
 
 export type GuideEditorMonacoHandle = { insertSnippet: (snippet: string) => void };
 
@@ -24,7 +26,7 @@ type GuideEditorMonacoProps = {
 
 const GuideEditorMonaco = forwardRef<GuideEditorMonacoHandle, GuideEditorMonacoProps>(
   ({ value, onChange, onSave }, ref) => {
-    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+    const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const onSaveRef = useRef(onSave);
     onSaveRef.current = onSave;
     useImperativeHandle(ref, () => ({
