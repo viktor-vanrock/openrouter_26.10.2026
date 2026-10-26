@@ -1,0 +1,201 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prototype-service
+  labels:
+    prototype.chatrouter/zone: service
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prototype-sandbox
+  labels:
+    prototype.chatrouter/zone: sandbox
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prototype-orchestrator
+  namespace: prototype-service
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prototype-model-gateway
+  namespace: prototype-service
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prototype-dependency-gateway
+  namespace: prototype-service
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prototype-generation
+  namespace: prototype-sandbox
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prototype-offline
+  namespace: prototype-sandbox
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prototype-installer
+  namespace: prototype-sandbox
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prototype-transfer
+  namespace: prototype-sandbox
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prototype-scheduler
+  namespace: prototype-sandbox
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["prototype-sandbox-capabilities"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prototype-scheduler
+  namespace: prototype-sandbox
+subjects:
+  - kind: ServiceAccount
+    name: prototype-orchestrator
+    namespace: prototype-service
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prototype-scheduler
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prototype-runtimeclass-reader
+rules:
+  - apiGroups: ["node.k8s.io"]
+    resources: ["runtimeclasses"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prototype-runtimeclass-reader
+subjects:
+  - kind: ServiceAccount
+    name: prototype-orchestrator
+    namespace: prototype-service
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prototype-runtimeclass-reader
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prototype-sandbox-capabilities
+  namespace: prototype-sandbox
+data:
+  # An operator changes these only after the runtime checks in P1.5 pass.
+  networkPolicyEnforced: "false"
+  admissionPolicyEnforced: "false"
+  pidLimitEnforced: "false"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sandbox-default-deny
+  namespace: prototype-sandbox
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: prototype-sandbox-jobs
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["jobs"]
+  validations:
+    - expression: "object.metadata.namespace != 'prototype-sandbox' || (has(object.metadata.labels) && object.metadata.labels['app.kubernetes.io/name'] == 'prototype-sandbox')"
+      message: "sandbox Jobs require the prototype identity label"
+    - expression: "object.metadata.namespace != 'prototype-sandbox' || (object.spec.backoffLimit == 0 && has(object.spec.activeDeadlineSeconds) && has(object.spec.ttlSecondsAfterFinished))"
+      message: "sandbox Jobs require bounded deadlines, TTL, and no retries"
+    - expression: "object.metadata.namespace != 'prototype-sandbox' || (has(object.spec.template.spec.runtimeClassName) && object.spec.template.spec.runtimeClassName != '')"
+      message: "sandbox Jobs require an explicit RuntimeClass"
+    - expression: "object.metadata.namespace != 'prototype-sandbox' || object.spec.template.spec.automountServiceAccountToken == false"
+      message: "sandbox Jobs must not mount a service account token"
+    - expression: "object.metadata.namespace != 'prototype-sandbox' || object.spec.template.spec.serviceAccountName in ['prototype-generation', 'prototype-installer', 'prototype-offline', 'prototype-transfer']"
+      message: "sandbox Jobs use stage-specific service accounts"
+    - expression: "object.metadata.namespace != 'prototype-sandbox' || (!object.spec.template.spec.hostNetwork && !object.spec.template.spec.hostPID && !object.spec.template.spec.hostIPC)"
+      message: "sandbox Jobs cannot share host namespaces"
+    - expression: "object.metadata.namespace != 'prototype-sandbox' || !has(object.spec.template.spec.volumes) || object.spec.template.spec.volumes.all(v, !has(v.hostPath))"
+      message: "sandbox Jobs cannot mount hostPath volumes"
+    - expression: "object.metadata.namespace != 'prototype-sandbox' || object.spec.template.spec.containers.all(c, c.image.matches('^.+@sha256:[a-f0-9]{64}$'))"
+      message: "sandbox container images must be digest pinned"
+    - expression: "object.metadata.namespace != 'prototype-sandbox' || object.spec.template.spec.containers.all(c, c.securityContext.runAsNonRoot == true && c.securityContext.allowPrivilegeEscalation == false && c.securityContext.privileged == false && c.securityContext.readOnlyRootFilesystem == true && c.securityContext.capabilities.drop.exists(x, x == 'ALL'))"
+      message: "sandbox containers require the restricted security profile"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: prototype-sandbox-jobs
+spec:
+  policyName: prototype-sandbox-jobs
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        prototype.chatrouter/zone: sandbox
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: service-default-deny
+  namespace: prototype-service
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Dependency Gateway egress is intentionally restricted to an operator-supplied
+# proxy CIDR/port overlay. This base manifest never grants registry or Internet egress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dependency-gateway-proxy-only-placeholder
+  namespace: prototype-service
+  annotations:
+    prototype.chatrouter/status: BLOCKED_BY_ENVIRONMENT
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prototype-dependency-gateway
+  policyTypes: [Egress]
+  egress: []

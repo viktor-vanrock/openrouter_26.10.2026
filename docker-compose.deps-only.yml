@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: chat-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - librechat-network
+
+  # MongoDB - основная БД
+  mongodb:
+    image: mongo:6
+    container_name: chat-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - librechat-network
+
+  # Local prototype transactions use a separate persistent single-node replica set.
+  # Explicit profile keeps ordinary chat dependency startup independent.
+  prototype-mongo:
+    profiles: ["prototype"]
+    image: mongo@sha256:8b6d8f5bbedb25cb73517b65cf99f13aeb75ad5b157a56c479287a840bbad3ac
+    container_name: chat-prototype-mongodb
+    restart: unless-stopped
+    command: ["mongod", "--replSet", "prototype-rs", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - "127.0.0.1:19017:27017"
+    volumes:
+      # Reuse the preserved prototype volume; never mount the chat Mongo volume here.
+      - prototype_mongo_data:/data/db
+      - ./apps/prototype-service/deploy/local-dependencies/ensure-replica.js:/opt/prototype/ensure-replica.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "/opt/prototype/ensure-replica.js"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    networks:
+      - librechat-network
+
+  # Meilisearch - поиск
+  meilisearch:
+    image: getmeili/meilisearch:v1.10
+    container_name: chat-meilisearch
+    restart: unless-stopped
+    ports:
+      - "7700:7700"
+    volumes:
+      - meilisearch_data:/meili_data
+    environment:
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
+    networks:
+      - librechat-network
+
+  # PostgreSQL + pgvector - для RAG (векторная БД)
+  vectordb:
+    image: pgvector/pgvector:pg16
+    container_name: vectordb
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: mydatabase
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+    networks:
+      - librechat-network
+
+  # RAG API - для работы с файлами
+  rag_api:
+    image: registry.librechat.ai/danny-avila/librechat-rag-api-dev-lite:latest
+    container_name: rag_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=vectordb
+      - RAG_PORT=${RAG_PORT:-8000}
+    depends_on:
+      - vectordb
+    networks:
+      - librechat-network
+
+networks:
+  librechat-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  # Idempotent preparation: docker volume create prototype_mongo_data
+  # External ownership preserves the older prototype store and prevents compose down -v deletion.
+  prototype_mongo_data:
+    external: true
+    name: prototype_mongo_data
+  meilisearch_data:
+    driver: local
+  postgres_data:
+    driver: local

@@ -1,0 +1,32 @@
+global:
+  security:
+    allowInsecureImages: true
+
+mongodb:
+  architecture: replicaset
+  replicaCount: 3
+  replicaSetName: rs0
+  # Chart default is arbiter.enabled=true. An arbiter does not ack
+  # w:majority, so transactions fail. Keep this false.
+  arbiter:
+    enabled: false
+  auth:
+    enabled: true
+    rootUser: root
+  image:
+    repository: bitnamilegacy/mongodb
+  persistence:
+    storageClass: csi-disk-topology
+    # Same as the standalone. Change before the first install; PVCs do not shrink.
+    size: 10Gi
+  persistentVolumeClaimRetentionPolicy:
+    enabled: true
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: mongodb
+          app.kubernetes.io/instance: "{{ .Release.Name }}"
+          app.kubernetes.io/component: mongodb

@@ -1,0 +1,86 @@
+{{- $repository := required "image.repository is required" .Values.image.repository }}
+{{- $digest := required "image.digest is required" .Values.image.digest }}
+{{- if not (regexMatch "^sha256:[a-f0-9]{64}$" $digest) }}{{ fail "image.digest must be sha256:64hex" }}{{ end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels: { app: {{ .Release.Name }} }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: {{ .Release.Name }} }
+  template:
+    metadata:
+      labels: { app: {{ .Release.Name }} }
+      {{- with .Values.podAnnotations }}
+      annotations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.serviceAccountName }}
+      serviceAccountName: {{ . }}
+      {{- end }}
+      automountServiceAccountToken: {{ not (empty .Values.podAnnotations) }}
+      terminationGracePeriodSeconds: 45
+      {{- with .Values.hostAliases }}
+      hostAliases: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: worker
+          image: {{ printf "%s@%s" $repository $digest | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: {{ toYaml .Values.command | nindent 12 }}
+          {{- with .Values.existingSecretName }}
+          envFrom:
+            - secretRef: { name: {{ . }} }
+          {{- end }}
+          env:
+            - { name: NODE_ENV, value: production }
+            - { name: LOG_TO_FILE, value: "false" }
+            - { name: PROTOTYPE_BIND_HOST, value: "0.0.0.0" }
+            - { name: PROTOTYPE_PORT, value: "3090" }
+            - { name: PROTOTYPE_SERVICE_ROLE, value: orchestrator }
+            - { name: PROTOTYPE_EXECUTION_BACKEND, value: sandbox-gateway }
+            - { name: PROTOTYPE_SERVICE_AUTH_MODE, value: bearer }
+            - { name: PROTOTYPE_WORKER_INTAKE_ENABLED, value: {{ .Values.intakeEnabled | toString | quote }} }
+            - { name: PROTOTYPE_CONTROL_PLANE_URL, value: {{ .Values.controlPlaneUrl | quote }} }
+            - { name: PROTOTYPE_WORKSPACE_DIR, value: /var/lib/prototype/workspace }
+            - { name: PROTOTYPE_LOCAL_TURN_LIMIT_USD, value: "2" }
+            - { name: PROTOTYPE_CONCURRENCY_GLOBAL, value: "2" }
+            - { name: PROTOTYPE_CONCURRENCY_TENANT, value: "2" }
+            - { name: PROTOTYPE_CONCURRENCY_USER, value: "1" }
+            - { name: PROTOTYPE_SHUTDOWN_TIMEOUT_MS, value: "40000" }
+          ports: [{ name: health, containerPort: 3090 }]
+          startupProbe:
+            httpGet: { path: /healthz, port: health }
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /healthz, port: health }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: {{ ternary "/readyz" "/healthz" .Values.intakeEnabled }}, port: health }
+            periodSeconds: 5
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: workspace, mountPath: /var/lib/prototype }
+            - { name: temp, mountPath: /tmp }
+      volumes:
+        - name: workspace
+          persistentVolumeClaim: { claimName: {{ .Release.Name }}-cache }
+        - name: temp
+          emptyDir: { sizeLimit: 256Mi }

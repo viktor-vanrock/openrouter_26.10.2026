@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "gatewayApi": 1,
+  "observedGatewayRelease": "v0.7.4",
+  "build": {
+    "profile": "offline-react-build-v1",
+    "image": "swr.ru-moscow-1.hc.sbercloud.ru/sber_devices/rndml/devops/k8s-sandbox-gw/sandbox-images@sha256:e492c69db3994a3c4c1026399a5ebf8e6357c37727411e1e53d3fcf09caceb33",
+    "runner": "/opt/prototype/runner/build.mjs",
+    "templateDigest": "sha256:8b57ff2a1c415c96c07483e14af311461e404af568d9f47e4086330d1bacb2ed",
+    "toolchainDigest": "sha256:1e9169f03b968d1e055eecf1b0e99f4131e44bc645823cb3e9a8f5a8a144ec55",
+    "cpus": 2,
+    "memoryMb": 2048,
+    "storageMb": 4096,
+    "timeoutMs": 600000
+  },
+  "buildFsd": {
+    "profile": "offline-react-fsd-build-v1",
+    "image": "swr.ru-moscow-1.hc.sbercloud.ru/sber_devices/rndml/devops/k8s-sandbox-gw/sandbox-images@sha256:e492c69db3994a3c4c1026399a5ebf8e6357c37727411e1e53d3fcf09caceb33",
+    "runner": "/opt/prototype/runner/build.mjs",
+    "templateDigest": "sha256:8b57ff2a1c415c96c07483e14af311461e404af568d9f47e4086330d1bacb2ed",
+    "toolchainDigest": "sha256:1e9169f03b968d1e055eecf1b0e99f4131e44bc645823cb3e9a8f5a8a144ec55",
+    "rulesDigest": "sha256:567dd0eca814f2db5956961549710bf9214d4358dc1f6391eaa8d360dbb16474",
+    "cpus": 2,
+    "memoryMb": 2048,
+    "storageMb": 4096,
+    "timeoutMs": 600000
+  },
+  "agent": null,
+  "productionApproved": false
+}

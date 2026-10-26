@@ -1,0 +1,17 @@
+image:
+  repository: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+existingSecretName: prototype-worker-env
+command: [node, apps/prototype-service/src/entrypoint.js]
+serviceAccountName: ""
+podAnnotations: {}
+hostAliases: []
+intakeEnabled: false
+controlPlaneUrl: https://orchat.sberai-rnd.ru
+storageClassName: csi-disk-topology
+storageSize: 5Gi
+resources:
+  requests: { cpu: 500m, memory: 512Mi }
+  limits: { cpu: "2", memory: 2Gi, ephemeral-storage: 1Gi }

@@ -1,0 +1,42 @@
+# Desired operator-owned profile, NOT a Gateway API1 POST body or a Kubernetes manifest.
+# API1 SandboxSpec has no network profile/user field. The operator must enforce these at the platform.
+profile: prototype-agent-model-proxy-v1
+accepted: false
+candidateFile: agent/candidate.json
+resources:
+  cpus: 1
+  memory_mb: 1024
+  storage_mb: 2048
+runtime:
+  uid: 10001
+  gid: 10001
+  # Image USER alone is insufficient: observed Gateway session uid=0.
+  launcher: [node, /opt/prototype/agent/launch.mjs]
+  allowedModes: [runtime-probe, hostile-config, adapter]
+  credentials: [short-lived-task-scoped-model-token-only]
+  deny: [provider-key, service-bearer, rsa-key, gateway-token, mongo-uri, storage-key]
+network:
+  defaultEgress: deny
+  allow:
+    - destination: orchat.sberai-rnd.ru
+      port: 443
+      protocol: HTTPS
+      paths: [/api/prototype-model/v1/models, /api/prototype-model/v1/chat/completions]
+    - destination: approved-cluster-dns
+      ports: [53]
+      protocols: [UDP, TCP]
+  denyDirectProvider: true
+  denyUnrelatedPublic: true
+  tlsVerification: required
+  redirects: deny
+agent:
+  version: 1.18.16
+  pure: true
+  projectConfig: disabled
+  projectPlugins: disabled
+  externalSkills: disabled
+  modelCatalogFetch: disabled
+  bash: deny
+  webfetch: deny
+  externalDirectory: deny
+  modelRetries: 0 # Still requires installed-provider transport acceptance.

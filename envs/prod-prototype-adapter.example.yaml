@@ -1,0 +1,25 @@
+# Merge AFTER envs/prod.yaml for an adapter-only release. No generation worker.
+# HTTPS terminates at the existing ingress; no client certificates/private listener.
+global:
+  librechat:
+    env:
+      - name: PROTOTYPE_TRANSPORT_ENABLED
+        value: "false"
+      - name: PROTOTYPE_MODEL_PROXY_ENABLED
+        value: "true"
+      - name: PROTOTYPE_SERVICE_AUTH_MODE
+        value: "bearer"
+      - name: OPENROUTER_API_URL
+        value: "https://or.crbrcloud.ru/api/v1"
+librechat:
+  configEnv:
+    PROTOTYPE_TRANSPORT_ENABLED: "false"
+    PROTOTYPE_MODEL_PROXY_ENABLED: "true"
+    PROTOTYPE_SERVICE_AUTH_MODE: "bearer"
+    OPENROUTER_API_URL: "https://or.crbrcloud.ru/api/v1"
+# Supply through existingSecretName (librechat-secret-env):
+# PROTOTYPE_MONGO_URI, PROTOTYPE_SERVICE_TOKEN, PROTOTYPE_MODEL_TOKEN_PRIVATE_KEY_BASE64.
+# Do not set PROTOTYPE_MODEL_TOKEN_PRIVATE_KEY_PATH together with BASE64.
+# Preserve existing MONGO_URI/provider credentials/AWS/Redis/JWT settings.
+# Configure TRUST_PROXY for the ingress and prevent direct external access to API port3080.
+# Existing Secret envFrom may override ConfigMap; explicit env above pins nonsecret flags.

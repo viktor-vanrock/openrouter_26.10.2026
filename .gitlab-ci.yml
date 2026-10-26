@@ -1,0 +1,79 @@
+include:
+  - project: "rndml-public/devops/job-templates"
+    file:
+      - ".deploy.yml"
+  - .deploy.yml
+  - .gitlab/prototype-service.yml
+
+stages:
+  - prepare
+  - test
+  - build
+  - deploy
+  - build_agents
+
+.rules:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+get_version:
+  extends: .getversion
+  stage: prepare
+  rules: !reference [.rules, rules]
+  tags: [kube-newprod]
+
+build:
+  extends: .kaniko
+  stage: build
+  tags:
+    - kube-newprod
+  rules: !reference [.rules, rules]
+  dependencies:
+    - get_version
+  variables:
+    DOCKERFILE: Dockerfile.multi
+
+# 🔍 Диагностика кластера
+debug_k8s:
+  extends: .kube_deploy
+  stage: deploy
+  needs: []
+  tags: [cce-rndml-prod]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+      allow_failure: true
+  variables:
+    APP_NAME: librechat
+    APP_NAMESPACE: openrouter-chat
+    CHART_DIR: './helm8/'
+    CHART_NAME: '.'
+    CHART_PATH: 'helm/librechat'
+    CHART_DEPENDENCY_DOWNLOAD: "false"
+    CHART_REPO: https://gitlab-ci-token:$CI_JOB_TOKEN@git.sberdevices.ru/rndml/devops/helm-template.git
+    CHART_REF: 'master'
+    CHART_VALUES: prod
+    ENVIRONMENT: prod
+    VALUES_PATH: envs/prod.yaml
+  script:
+    - echo "=== Pods ==="
+    - kubectl get pods -n $APP_NAMESPACE -o wide || true
+    - echo ""
+    - echo "=== Describe pods ==="
+    - kubectl describe pods -n $APP_NAMESPACE || true
+    - echo ""
+    - echo "=== Events ==="
+    - kubectl get events -n $APP_NAMESPACE --sort-by='.lastTimestamp' | tail -50 || true
+    - echo ""
+    - echo "=== Logs ==="
+    - |
+      for pod in $(kubectl get pods -n $APP_NAMESPACE -o name 2>/dev/null); do
+        echo "--- $pod ---"
+        kubectl logs $pod -n $APP_NAMESPACE --tail=100 --all-containers=true 2>&1 || true
+        echo ""
+      done
+    - echo "=== Helm status ==="
+    - helm status $APP_NAME -n $APP_NAMESPACE || true
+    - echo ""
+    - echo "=== Helm history ==="
+    - helm history $APP_NAME -n $APP_NAMESPACE || true

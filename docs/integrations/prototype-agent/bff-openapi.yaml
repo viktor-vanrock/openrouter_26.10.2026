@@ -1,0 +1,414 @@
+openapi: 3.1.0
+info:
+  title: Prototype Agent BFF
+  version: 1.0.0
+  description: Authenticated browser contract for durable prototype state and actions.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+  - sessionCookie: []
+tags:
+  - name: Prototypes
+paths:
+  /api/prototypes/{jobId}:
+    get:
+      tags: [Prototypes]
+      operationId: getPrototype
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/PrototypeConversationQuery'
+      responses:
+        '200': { $ref: '#/components/responses/PrototypeCard' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /api/prototypes/{jobId}/replies:
+    post:
+      tags: [Prototypes]
+      operationId: replyToPrototype
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/PrototypeConversationHeader'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/PrototypeRevision'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrototypeReplyRequest' }
+            example: { messageId: message_01, prototypeReplyToMessageId: message_00 }
+      responses:
+        '200': { $ref: '#/components/responses/PrototypeCard' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+        '504': { $ref: '#/components/responses/ServiceTimeout' }
+  /api/prototypes/{jobId}/cancel:
+    post:
+      tags: [Prototypes]
+      operationId: cancelPrototype
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/PrototypeConversationHeader'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/PrototypeRevision'
+      requestBody: { $ref: '#/components/requestBodies/EmptyAction' }
+      responses:
+        '200': { $ref: '#/components/responses/PrototypeCard' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+        '504': { $ref: '#/components/responses/ServiceTimeout' }
+  /api/prototypes/{jobId}/resume:
+    post:
+      tags: [Prototypes]
+      operationId: resumePrototype
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/PrototypeConversationHeader'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/PrototypeRevision'
+      requestBody: { $ref: '#/components/requestBodies/EmptyAction' }
+      responses:
+        '200': { $ref: '#/components/responses/PrototypeCard' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+        '504': { $ref: '#/components/responses/ServiceTimeout' }
+  /api/prototypes/{jobId}/approve:
+    post:
+      tags: [Prototypes]
+      operationId: approvePrototypePlan
+      parameters: [{ $ref: '#/components/parameters/JobId' }, { $ref: '#/components/parameters/PrototypeConversationHeader' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/PrototypeRevision' }]
+      requestBody: { $ref: '#/components/requestBodies/EmptyAction' }
+      responses:
+        '200': { $ref: '#/components/responses/PrototypeCard' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/prototypes/{jobId}/retry:
+    post:
+      tags: [Prototypes]
+      operationId: retryPrototype
+      parameters: [{ $ref: '#/components/parameters/JobId' }, { $ref: '#/components/parameters/PrototypeConversationHeader' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/PrototypeRevision' }]
+      requestBody: { $ref: '#/components/requestBodies/EmptyAction' }
+      responses:
+        '200': { $ref: '#/components/responses/PrototypeCard' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/prototypes/{jobId}/finalize:
+    post:
+      tags: [Prototypes]
+      operationId: finalizePrototype
+      parameters: [{ $ref: '#/components/parameters/JobId' }, { $ref: '#/components/parameters/PrototypeConversationHeader' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/PrototypeRevision' }]
+      requestBody: { $ref: '#/components/requestBodies/EmptyAction' }
+      responses:
+        '200': { $ref: '#/components/responses/PrototypeCard' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/prototypes/{jobId}/sources:
+    get:
+      tags: [Prototypes]
+      operationId: downloadPrototypeSources
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/PrototypeConversationQuery'
+        - $ref: '#/components/parameters/Version'
+      responses:
+        '200':
+          description: Source archive streamed after authorization.
+          headers:
+            Content-Disposition:
+              schema: { type: string }
+              description: ASCII fallback plus RFC 5987 filename*.
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/ArtifactNotReady' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /api/prototypes/{jobId}/html:
+    get:
+      tags: [Prototypes]
+      operationId: renderPrototypeHtml
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/PrototypeConversationQuery'
+        - $ref: '#/components/parameters/Version'
+      responses:
+        '200':
+          description: Accepted standalone HTML with restrictive CSP.
+          content: { text/html: { schema: { type: string, format: binary } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/ArtifactNotReady' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /api/prototypes/{jobId}/html-download:
+    get:
+      tags: [Prototypes]
+      operationId: downloadPrototypeHtml
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/PrototypeConversationQuery'
+        - $ref: '#/components/parameters/Version'
+      responses:
+        '200':
+          description: Accepted standalone HTML attachment.
+          content: { text/html: { schema: { type: string, format: binary } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/ArtifactNotReady' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /api/conversations/{conversationId}/prototype:
+    post:
+      tags: [Prototypes]
+      operationId: submitConversationPrototypeTurn
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrototypeSubmitRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/PrototypeCard' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+    get:
+      tags: [Prototypes]
+      operationId: getConversationPrototype
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      responses:
+        '200': { $ref: '#/components/responses/PrototypeCard' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /api/conversations/{conversationId}/prototype/events:
+    get:
+      tags: [Prototypes]
+      operationId: streamConversationPrototypeEvents
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - name: Last-Event-ID
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: Resumable event stream. Phase 2 may return current durable state.
+          content:
+            text/event-stream:
+              schema: { type: string }
+            application/json:
+              schema: { $ref: '#/components/schemas/PrototypeCard' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+    sessionCookie: { type: apiKey, in: cookie, name: refreshToken }
+  parameters:
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^job_[a-fA-F0-9]{24}$' }
+    ConversationId:
+      name: conversationId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 1 }
+    PrototypeRevision:
+      name: X-Prototype-Revision
+      in: header
+      required: true
+      schema: { type: integer, minimum: 0 }
+    PrototypeConversationHeader:
+      name: X-Prototype-Conversation-Id
+      in: header
+      required: true
+      schema: { type: string, minLength: 1 }
+    PrototypeConversationQuery:
+      name: conversationId
+      in: query
+      required: true
+      schema: { type: string, minLength: 1 }
+    Version:
+      name: version
+      in: query
+      required: false
+      schema: { type: integer, minimum: 0 }
+  requestBodies:
+    EmptyAction:
+      required: true
+      content:
+        application/json:
+          schema: { type: object, additionalProperties: false }
+          example: {}
+  schemas:
+    PrototypeReplyRequest:
+      type: object
+      additionalProperties: false
+      required: [messageId, prototypeReplyToMessageId]
+      properties:
+        messageId: { type: string, minLength: 1 }
+        prototypeReplyToMessageId: { type: string, minLength: 1 }
+        selectedVariant:
+          type: string
+          enum: [A, B]
+          description: Select a design once during review. Starts an edit to keep that design; completion is a separate action.
+    PrototypeSubmitRequest:
+      type: object
+      additionalProperties: false
+      required: [messageId, parentMessageId, text, modelId]
+      properties:
+        messageId: { type: string, minLength: 1 }
+        parentMessageId: { type: string, minLength: 1 }
+        text: { type: string, minLength: 1, maxLength: 50000 }
+        fileIds:
+          type: array
+          maxItems: 10
+          items: { type: string, minLength: 1, maxLength: 128 }
+          description: Owned files uploaded as text. The server snapshots their extracted text into the accepted turn; combined requirements must fit 50000 characters.
+        modelId: { type: string, minLength: 1 }
+        endpoint: { type: string, minLength: 1 }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        revision: { type: [integer, 'null'], minimum: 0 }
+    PrototypeStatus:
+      type: string
+      enum: [queued, preparing, running, waiting_for_input, review, waiting_for_credentials, waiting_for_funds, completed, failed, canceled]
+    CostEstimate:
+      type: object
+      additionalProperties: false
+      required: [currency, low, likely, high, recoveryBufferPercent, method, sampleSize, modelId, calculatedAt, balanceRemaining]
+      properties:
+        currency: { const: USD }
+        low: { type: number }
+        likely: { type: number }
+        high: { type: number }
+        recoveryBufferPercent: { const: 20 }
+        method: { type: string, enum: [admin_default, historical_quantiles] }
+        sampleSize: { type: integer, minimum: 0 }
+        modelId: { type: string, minLength: 1 }
+        calculatedAt: { type: string, format: date-time }
+        balanceRemaining: { type: [number, 'null'] }
+    PrototypeCard:
+      type: object
+      additionalProperties: false
+      required: [type, jobId, conversationId, turnId, revision, cursor, status, phase, waitingReason, promptMessageId, modelId, modelWarning, prototypeName, previewAvailable, sourcesAvailable, failure, activity, versions, actions, canCancel, canReply, estimatedCost, actualCostUsd]
+      properties:
+        type: { const: prototype }
+        jobId: { type: string }
+        conversationId: { type: string }
+        turnId: { type: [string, 'null'] }
+        revision: { type: integer, minimum: 0 }
+        cursor: { type: integer, minimum: 0 }
+        status: { $ref: '#/components/schemas/PrototypeStatus' }
+        phase: { type: [string, 'null'] }
+        waitingReason: { type: [string, 'null'], enum: [clarification, plan_approval, null] }
+        promptMessageId: { type: [string, 'null'] }
+        modelId: { type: string }
+        modelWarning: { type: [string, 'null'] }
+        selectedVariant: { type: [string, 'null'], enum: [A, B, null] }
+        prototypeName: { type: [string, 'null'] }
+        previewAvailable: { type: boolean }
+        sourcesAvailable: { type: boolean }
+        failure:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [code, message]
+              properties: { code: { type: string }, message: { type: string } }
+            - type: 'null'
+        activity:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, phase, message, createdAt]
+            properties:
+              id: { type: string }
+              phase: { type: [string, 'null'] }
+              message: { type: string }
+              createdAt: { type: string, format: date-time }
+        versions:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required: [revision, turnId, htmlDigest, sourcesDigest, acceptedAt]
+            properties:
+              revision: { type: integer, minimum: 0 }
+              turnId: { type: string }
+              htmlDigest: { type: string, pattern: '^sha256:[a-f0-9]{64}$' }
+              sourcesDigest: { type: string, pattern: '^sha256:[a-f0-9]{64}$' }
+              acceptedAt: { type: string, format: date-time }
+              selectedVariant: { type: [string, 'null'], enum: [A, B, null] }
+        actions:
+          type: object
+          additionalProperties: false
+          required: [approve, cancel, retry, finalize, reply]
+          properties:
+            approve: { type: boolean }
+            cancel: { type: boolean }
+            retry: { type: boolean }
+            finalize: { type: boolean }
+            reply: { type: boolean }
+        canCancel: { type: boolean }
+        canReply: { type: boolean }
+        estimatedCost: { oneOf: [{ $ref: '#/components/schemas/CostEstimate' }, { type: 'null' }] }
+        actualCostUsd: { type: number }
+    ErrorCode:
+      type: string
+      enum: [PROTOTYPE_JOB_NOT_FOUND, PROTOTYPE_ACTIVE_JOB_EXISTS, PROTOTYPE_INVALID_STATE, PROTOTYPE_STALE_REVISION, PROTOTYPE_INVALID_REPLY, PROTOTYPE_INVALID_REQUEST, PROTOTYPE_ATTACHMENT_INVALID, PROTOTYPE_REQUIREMENTS_TOO_LARGE, PROTOTYPE_CONTENT_BLOCKED, PROTOTYPE_MODERATION_UNAVAILABLE, PROTOTYPE_MODEL_UNSUPPORTED, PROTOTYPE_MODEL_BLOCKED, PROTOTYPE_ARTIFACT_NOT_READY, PROTOTYPE_STORAGE_UNAVAILABLE, PROTOTYPE_QUEUE_UNAVAILABLE, PROTOTYPE_SERVICE_UNAVAILABLE, PROTOTYPE_SERVICE_TIMEOUT, PROTOTYPE_CANCELED, PROTOTYPE_FAILED]
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code: { $ref: '#/components/schemas/ErrorCode' }
+            message: { type: string }
+  responses:
+    PrototypeCard:
+      description: Current durable prototype state.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PrototypeCard' }
+    NotFound:
+      description: Missing and foreign resources are indistinguishable.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: PROTOTYPE_JOB_NOT_FOUND, message: Prototype job not found } }
+    Conflict:
+      description: Invalid state, stale revision, canceled or failed job.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    ArtifactNotReady:
+      description: Artifact has not been published.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: PROTOTYPE_ARTIFACT_NOT_READY, message: Prototype artifact is not ready } }
+    InvalidRequest:
+      description: Invalid request, reply, model, or content rejected by the configured content policy.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    ServiceUnavailable:
+      description: Storage, queue, service, or content safety check unavailable.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    ServiceTimeout:
+      description: Prototype service timeout.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }

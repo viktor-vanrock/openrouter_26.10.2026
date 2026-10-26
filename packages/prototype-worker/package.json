@@ -1,0 +1,39 @@
+{
+  "name": "@librechat/prototype-worker",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "rollup -c --silent --bundleConfigAsCjs && tsc -p tsconfig.build.json --emitDeclarationOnly --declaration --pretty false",
+    "spike:continuity": "node scripts/opencode-continuity.mjs",
+    "spike:hostile-config": "node scripts/opencode-hostile-config.mjs",
+    "test": "jest --watch=false"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "1.18.16",
+    "@playwright/test": "1.63.0",
+    "ioredis": "^5.3.2",
+    "jszip": "^3.10.1",
+    "opencode-ai": "1.18.16",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@rollup/plugin-typescript": "^12.1.2",
+    "@types/jest": "^29.5.2",
+    "jest": "^30.2.0",
+    "rollup": "^4.34.9",
+    "typescript": "^5.0.4"
+  },
+  "optionalDependencies": {
+    "opencode-darwin-arm64": "1.18.16",
+    "opencode-darwin-x64": "1.18.16",
+    "opencode-linux-arm64": "1.18.16",
+    "opencode-linux-arm64-musl": "1.18.16",
+    "opencode-linux-x64": "1.18.16",
+    "opencode-linux-x64-musl": "1.18.16",
+    "opencode-windows-arm64": "1.18.16",
+    "opencode-windows-x64": "1.18.16"
+  }
+}

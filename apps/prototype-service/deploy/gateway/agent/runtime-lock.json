@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "baseImage": "node:24.16.0-alpine@sha256:21f403ab171f2dc89bad4dd69d7721bfd15f084ccb46cdd225f31f2bc59b5c9a",
+  "platform": "linux/amd64",
+  "opencodeVersion": "1.18.16",
+  "binaryPackage": "opencode-linux-x64-musl",
+  "binaryUrl": "https://registry.npmjs.org/opencode-linux-x64-musl/-/opencode-linux-x64-musl-1.18.16.tgz",
+  "binaryIntegrity": "sha512-ULqBV/MsG/0k/5+wkJbZvV9xzDy6Hl3DFD7YJwbHzhZ03CrivJozK7GnuAz6Zp+j466obPEaKdwr+nVdTbGiYA=="
+}

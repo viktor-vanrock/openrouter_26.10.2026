@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "profile": "prototype-agent-model-proxy-v1",
+  "accepted": false,
+  "image": "swr.ru-moscow-1.hc.sbercloud.ru/sber_devices/rndml/devops/k8s-sandbox-gw/sandbox-images@sha256:b048d1db00fc1d45753e7fe4483e0e5dc8cfcd7bb7975d140207fdfa2c14cb2b",
+  "opencodeVersion": "1.18.16",
+  "binaryDigest": "sha256:bad9b279fb1e76e74c9d867339f25faf506ab2ecf777f14265787048a76a7bda",
+  "contextDigest": "sha256:73c3f3a32bc2c2293ac28bfbbd82c87119b6b8e0c9e746e553fc426163043986",
+  "launcher": "/opt/prototype/agent/launch.mjs",
+  "runtimeUid": 10001,
+  "pureConfigAndInstalledDenialScenariosPassed": true,
+  "modelProxyHttpsReachable": true,
+  "platformEgressAccepted": false,
+  "observedForbiddenDestinations": {
+    "modelProxy": {
+      "reachable": true,
+      "status": 401
+    },
+    "providerUpstream": {
+      "reachable": true,
+      "status": 401
+    },
+    "unrelatedPublic": {
+      "reachable": true,
+      "status": 200
+    }
+  },
+  "blockers": [
+    "Gateway sessions ignore image USER; all trusted dispatch must use UID-dropping launcher",
+    "Gateway platform egress allows direct provider and unrelated public origins",
+    "deployed API commit/image evidence and real scoped SDK/SSE/model transport acceptance pending"
+  ],
+  "evidenceFile": ".prototype-dev/gateway-agent-image-1791556636683/receipt.json",
+  "releasePinUpdated": false,
+  "productionApproved": false
+}

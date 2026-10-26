@@ -1,0 +1,37 @@
+# Applied by the dedicated manual worker rollout, using the image digest from its build artifact.
+# Секреты из Vault (как у API в envs/prod.yaml): common — общие с API,
+# prototype-worker — только воркеру. Secret prototype-worker-env не нужен.
+existingSecretName: ""
+serviceAccountName: vault
+# Gateway в rndml-fleet-k8s: через пиринг VPC на приватный VIP его ELB.
+# Имя оставляем, чтобы сошёлся TLS-сертификат SANDBOX_GATEWAY_URL.
+hostAliases:
+  - ip: 192.168.100.88
+    hostnames: [fleet-sandbox-gw.sberai-rnd.ru]
+command:
+  - /bin/sh
+  - -c
+  - . /vault/secrets/common && . /vault/secrets/prototype-worker && exec node apps/prototype-service/src/entrypoint.js
+podAnnotations:
+  vault.hashicorp.com/agent-inject: "true"
+  vault.hashicorp.com/role: "rndml"
+  vault.hashicorp.com/agent-pre-populate-only: "true"
+  vault.hashicorp.com/agent-requests-cpu: "10m"
+  vault.hashicorp.com/agent-requests-mem: "32Mi"
+  vault.hashicorp.com/agent-inject-secret-common: "rndml/openrouter-chat/common"
+  vault.hashicorp.com/agent-inject-template-common: |
+    {{- with secret "rndml/openrouter-chat/common" -}}
+    {{ range $k, $v := .Data.data }}export {{ $k }}={{ $v | toJSON }}
+    {{ end }}{{- end -}}
+  vault.hashicorp.com/agent-inject-secret-prototype-worker: "rndml/openrouter-chat/prototype-worker"
+  vault.hashicorp.com/agent-inject-template-prototype-worker: |
+    {{- with secret "rndml/openrouter-chat/prototype-worker" -}}
+    {{ range $k, $v := .Data.data }}export {{ $k }}={{ $v | toJSON }}
+    {{ end }}{{- end -}}
+intakeEnabled: true
+controlPlaneUrl: https://orchat.sberai-rnd.ru
+storageClassName: csi-disk-topology
+storageSize: 5Gi
+
+imagePullSecrets:
+  - name: gitlab-registry-secret

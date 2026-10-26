@@ -1,0 +1,25 @@
+**/.circleci
+**/.editorconfig
+**/.dockerignore
+**/.git
+**/.DS_Store
+**/.vscode
+**/node_modules
+
+# Specific patterns to ignore
+data-node
+api/logs
+meili_data*
+librechat*
+Dockerfile*
+docs
+
+# Ignore all hidden files
+.*
+
+# Generated outputs and local compiler caches must not enter build layers.
+**/dist
+**/coverage
+**/.turbo
+**/.rpt2_cache
+**/*.tsbuildinfo

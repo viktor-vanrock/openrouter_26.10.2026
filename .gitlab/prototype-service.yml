@@ -1,0 +1,75 @@
+build_prototype_worker:
+  extends: .kaniko
+  stage: build
+  tags: [d-rndml-build]
+  needs: []
+  dependencies: []
+  before_script: []
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      allow_failure: true
+  variables:
+    DOCKERFILE: apps/prototype-service/Dockerfile
+  script:
+    - test -n "$kanikocfg"
+    - mkdir -p /kaniko/.docker
+    # umask только для config.json: в общей оболочке он доходит до kaniko, и
+    # каталоги образа создаются 0700 root (node: MODULE_NOT_FOUND под uid 10001).
+    - (umask 077 && printf '%s' "$kanikocfg" > /kaniko/.docker/config.json)
+    - test -n "$CI_REGISTRY_IMAGE"
+    - task_worker_repository="${CI_REGISTRY_IMAGE}/prototype-service"
+    - task_worker_tag="${CI_COMMIT_SHA}-${CI_PIPELINE_ID}"
+    - test "$(uname -m)" = "x86_64"
+    - /kaniko/executor --custom-platform linux/amd64 --context "$CI_PROJECT_DIR" --dockerfile "$CI_PROJECT_DIR/$DOCKERFILE" --target runtime --cache=true --cache-repo "${task_worker_repository}/cache" --destination "${task_worker_repository}:${task_worker_tag}" --digest-file "$CI_PROJECT_DIR/prototype-worker-image.digest"
+    - test -s prototype-worker-image.digest
+    - task_worker_digest="$(cat prototype-worker-image.digest)"
+    - printf 'PROTOTYPE_WORKER_IMAGE_REPOSITORY=%s\nPROTOTYPE_WORKER_IMAGE_DIGEST=%s\n' "$task_worker_repository" "$task_worker_digest" > prototype-worker-image.env
+  artifacts:
+    paths: [prototype-worker-image.digest]
+    reports:
+      dotenv: prototype-worker-image.env
+    expire_in: 7 days
+
+deploy_prototype_worker:
+  extends: .kube_deploy
+  stage: deploy
+  tags: [cce-rndml-prod]
+  needs:
+    - job: build_prototype_worker
+      artifacts: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      allow_failure: true
+  variables:
+    APP_NAME: prototype-worker
+    APP_NAMESPACE: openrouter-chat
+    VALUES_PATH: envs/prod-prototype-worker.yaml
+    WORKER_INTAKE_ENABLED: "true"
+  before_script:
+    - |
+      if [ "$FREEZE" = "true" ]; then printf '%s\n' "$FREEZE_MESSAGE"; exit 1; fi
+    - |
+      if [ -n "$OC_SERVER" ]; then oc login --server="$OC_SERVER" --token="$OC_TOKEN"; fi
+  # Limit failure diagnostics to this release; no automatic notifications or tag releases.
+  after_script:
+    - |
+      if [ "$CI_JOB_STATUS" != "success" ]; then
+        kubectl get pods -n "$APP_NAMESPACE" -l "app=$APP_NAME" -o wide || true
+        helm status "$APP_NAME" -n "$APP_NAMESPACE" || true
+      fi
+  resource_group: prototype-worker-production
+  script:
+    - test "$WORKER_INTAKE_ENABLED" = "true" || test "$WORKER_INTAKE_ENABLED" = "false"
+    - test -n "$PROTOTYPE_WORKER_IMAGE_REPOSITORY"
+    - test -n "$PROTOTYPE_WORKER_IMAGE_DIGEST"
+    - helm lint helm/prototype-service -f "$VALUES_PATH" --set-string image.repository="$PROTOTYPE_WORKER_IMAGE_REPOSITORY" --set-string image.digest="$PROTOTYPE_WORKER_IMAGE_DIGEST" --set intakeEnabled="$WORKER_INTAKE_ENABLED"
+    - helm upgrade --install "$APP_NAME" helm/prototype-service --namespace "$APP_NAMESPACE" -f "$VALUES_PATH" --set-string image.repository="$PROTOTYPE_WORKER_IMAGE_REPOSITORY" --set-string image.digest="$PROTOTYPE_WORKER_IMAGE_DIGEST" --set intakeEnabled="$WORKER_INTAKE_ENABLED" --atomic --wait --timeout 10m
+    - kubectl rollout status "deployment/$APP_NAME" -n "$APP_NAMESPACE" --timeout=120s
+    - kubectl get deployment "$APP_NAME" -n "$APP_NAMESPACE" -o wide
+    - printf 'prototype worker deployed\n' > success
+  environment:
+    name: production/prototype-worker

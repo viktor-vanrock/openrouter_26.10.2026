@@ -1,0 +1,1 @@
+{"root":["./src/app/app.tsx","./src/app/main.tsx","./src/app/providers/index.tsx","./src/shared/api/handlers.ts","./src/shared/api/msw-node-stub.ts","./src/shared/api/msw-setup.ts","./src/shared/config/routes.ts"],"version":"6.0.3"}

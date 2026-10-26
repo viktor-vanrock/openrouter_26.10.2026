@@ -1,0 +1,391 @@
+replicaCount: 1
+
+global:
+  librechat:
+    # Секреты приходят из Vault (podAnnotations ниже). Пустая строка, а не удаление:
+    # иначе чарт подставит свой дефолт librechat-credentials-env.
+    existingSecretName: ""
+    env:
+      - { name: PROTOTYPE_TRANSPORT_ENABLED, value: "true" }
+      - { name: PROTOTYPE_MODEL_PROXY_ENABLED, value: "true" }
+      - { name: PROTOTYPE_SERVICE_AUTH_MODE, value: "bearer" }
+      - { name: PROTOTYPE_LOCAL_TURN_LIMIT_USD, value: "2" }
+      - { name: OPENROUTER_API_URL, value: "https://or.crbrcloud.ru/api/v1" }
+
+librechat:
+  configEnv:
+    CREDS_KEY: e0035005ac34036b80d9ae987bb96fe7ffc13e7dd544b5b4a8574c58d07bbaaa
+    CREDS_IV: e0583b0c7e676431fa8c05ff12ef6990
+    JWT_SECRET: a41e69e95aac9334526324dedd27754702822ef30e2f3009698d10b8676355dd
+    JWT_REFRESH_SECRET: a5306fb0d20eff3a5a0d74d379652982ed076aa49c0e7883749a23d93a31229a
+    OPENROUTER_API_URL: "https://openrouter.ai/api/v1"
+    CUSTOM_FOOTER: ""
+    ALLOW_PASSWORD_RESET: "true"
+    PROTOTYPE_TRANSPORT_ENABLED: "true"
+    PROTOTYPE_MODEL_PROXY_ENABLED: "true"
+    PROTOTYPE_SERVICE_AUTH_MODE: "bearer"
+    PROTOTYPE_LOCAL_TURN_LIMIT_USD: "2"
+
+  existingSecretName: ""
+  
+  configYamlContent: |
+    version: 1.3.6
+    cache: false
+
+    prototypeAgent:
+      enabled: true
+      modelPolicy:
+        version: "gateway-react-v1"
+        blockedPatterns: []
+        requireToolCalling: false
+        unknownModelPolicy: "warn"
+      costDefaults: {}
+      storage:
+        driver: "s3"
+        root: "prototype"
+      preview:
+        origin: "https://orchat.sberai-rnd.ru"
+        ticketTtlSeconds: 60
+
+    registration:
+      socialLogins: []
+      
+    endpoints:
+      custom:
+        - name: "OpenRouter"
+          # Для проброса ключа из интерфейса
+          apiKey: "user_provided"
+          userProvide: true
+          baseURL: "https://or.crbrcloud.ru/api/v1"
+          userKeyExpiry: "2099-01-01T00:00:00.000Z"
+          models:
+            default: ["openai/gpt-4o"]
+            fetch: true                              
+          titleConvo: true
+          titleModel: "openai/gpt-4o"
+          dropParams: ["stop"]
+          modelDisplayLabel: "OpenRouter"
+      agents:
+        # Полностью отключает интерфейс конструктора агентов
+        disableBuilder: false
+        # Убирает пункт "Воспоминания" (Memory) из интерфейса агента
+        memory: false
+        # Позволяет отправлять файлы как текст.
+        capabilities:
+          - "context"
+          - "tools"
+          - "web_search"
+          - "skills"
+          - "actions"
+          - "file_search"
+
+    webSearch:
+      searchProvider: tavily
+      scraperProvider: tavily
+      tavilyApiKey: '${TAVILY_API_KEY}'
+      rerankerType: none
+      safeSearch: 1
+      scraperTimeout: 15000
+
+    fileConfig:
+      endpoints:
+        custom:
+          # Лимит на количество загруженных файлов
+          fileLimit: 5
+          supportedMimeTypes:
+            # Текстовые файлы
+            - "text/plain"
+            - "text/csv"
+            - "text/markdown"
+            - "application/json"
+            # Документы
+            - "application/pdf"
+            - "application/msword"
+            - "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            - "application/vnd.ms-excel"
+            - "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            - "application/vnd.ms-powerpoint"
+            - "application/vnd.oasis.opendocument.presentation"
+            - "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            - "application/rtf"
+            # Изображения
+            - "image/jpeg"
+            - "image/png"
+            - "image/gif"
+            - "image/webp"
+            - "image/bmp"
+            - "image/tiff"
+        default:
+          fileLimit: 5
+      
+      # OCR настройки (для документов и изображений)
+      ocr:
+        supportedMimeTypes:
+          # Документы
+          - "application/pdf"
+          - "application/msword"
+          - "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          - "application/vnd.ms-excel"
+          - "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          - "application/vnd.ms-powerpoint"
+          - "application/vnd.oasis.opendocument.presentation"
+          - "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+          - "application/rtf"
+          - "text/plain"
+          - "text/csv"
+          # Изображения
+          - "image/jpeg"
+          - "image/png"
+          - "image/gif"
+          - "image/webp"
+          - "image/bmp"
+          - "image/tiff"
+      
+      # Текстовый парсер
+      text:
+        supportedMimeTypes:
+          - "text/plain"
+          - "text/csv"
+          - "text/markdown"
+          - "application/json"
+          - "application/javascript"
+          - "application/typescript"
+          - "text/css"
+          - "text/x-python"
+          - "text/x-java"
+          - "text/x-c"
+          - "text/x-cpp"
+          - "text/x-sh"
+          - "text/x-sql"
+          - "application/x-yaml"
+          - "text/x-pascal"
+          - "text/x-rust"
+          - "text/x-go"
+
+    interface:
+      # Включить режим запроса в нескольких экранах
+      multiConvo: true
+      bookmarks: false
+      parameters: false
+      presets: false
+      prompts: false
+      # Скрыть пункт "Агенты" в боковом меню
+      agents: true
+      # Скрыть пункт "Магазин агентов" (Marketplace)
+      marketplace:
+        use: true
+      # Скрыть MCP сервера в выпадающем меню чата (оставит их доступными только для агентов)
+      mcpServers:
+        use: false
+        create: false
+        share: false
+        public: false
+    memory:
+      disabled: true
+    # Полное отключение MCP в интерфейсе обычного чата
+    # mcpServers:
+    #   # Убирает MCP сервера из меню выбора под строкой ввода сообщения
+    #   chatMenu:
+    #     use: false
+
+  # name of existing Yaml configmap, key must be librechat.yaml
+  existingConfigYaml: ""
+
+  # Volume used to store image Files uploaded to the Web UI
+  imageVolume:
+    enabled: true
+    size: 10G
+    accessModes: ReadWriteOnce
+    storageClassName: "csi-disk-topology"
+
+
+# only lite RAG is supported
+librechat-rag-api:
+  enabled: false
+  # can be azure, openai, huggingface or huggingfacetei
+  embeddingsProvider: openai
+
+
+image:
+  repository: rndbtoc/openrouter-chat/openrouter-chat
+  registry: registry.sberdevices.ru
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
+serviceAccount:
+  create: false
+  automount: true
+  annotations: {}
+  name: vault
+
+lifecycle: {}
+
+# Секреты из Vault: common — общие с prototype-worker, api — только API.
+# Экспорт из файлов перекрывает configEnv и librechat-secret-env.
+command: ["/bin/sh", "-c"]
+args:
+  - . /vault/secrets/common && . /vault/secrets/api && exec node server/index.js
+
+podAnnotations:
+  vault.hashicorp.com/agent-inject: "true"
+  vault.hashicorp.com/role: "rndml"
+  vault.hashicorp.com/agent-pre-populate-only: "true"
+  vault.hashicorp.com/agent-requests-cpu: "10m"
+  vault.hashicorp.com/agent-requests-mem: "32Mi"
+  vault.hashicorp.com/agent-inject-secret-common: "rndml/openrouter-chat/common"
+  vault.hashicorp.com/agent-inject-template-common: |
+    {{- with secret "rndml/openrouter-chat/common" -}}
+    {{ range $k, $v := .Data.data }}export {{ $k }}={{ $v | toJSON }}
+    {{ end }}{{- end -}}
+  vault.hashicorp.com/agent-inject-secret-api: "rndml/openrouter-chat/api"
+  vault.hashicorp.com/agent-inject-template-api: |
+    {{- with secret "rndml/openrouter-chat/api" -}}
+    {{ range $k, $v := .Data.data }}export {{ $k }}={{ $v | toJSON }}
+    {{ end }}{{- end -}}
+podLabels: {}
+deploymentAnnotations: {}
+deploymentLabels: {}
+
+enableServiceLinks: true
+
+podSecurityContext:
+  fsGroup: 2000
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  # readOnlyRootFilesystem: true # not supported yet
+  runAsNonRoot: true
+  runAsUser: 1000
+
+service:
+  type: ClusterIP # LoadBalancer, NodePort, ClusterIP
+  port: 3080
+  targetPort: 3080
+  containerPort: 3080
+  annotations: {}
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations: 
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-production
+  hosts:
+    - host: orchat.sberai-rnd.ru
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: 
+   - secretName: or-sberai-tls
+     hosts:
+       - orchat.sberai-rnd.ru
+
+resources: {}
+
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 3080
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 3080
+
+# Additional init containers on the output Deployment definition.
+initContainers: {}
+#   foo: # the name of the init container
+#     image: busybox
+#     command: ['sh', '-c', 'echo The app is starting! && sleep 5']
+#   # ... add more init containers as needed
+
+# Additional volumes on the output Deployment definition.
+volumes:
+  - name: uploads-volume
+    emptyDir: {}
+# - name: foo
+#   secret:
+#     secretName: mysecret
+#     optional: false
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts:
+  - name: uploads-volume
+    mountPath: /app/uploads
+# - name: foo
+#   mountPath: "/etc/foo"
+#   readOnly: true
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Host aliases for custom domain-to-IP mappings (adds entries to /etc/hosts)
+hostAliases: []
+# Example - Redirect AWS Bedrock to proxy:
+# hostAliases:
+#   - ip: "10.1.2.3"
+#     hostnames:
+#       - "bedrock-runtime.eu-central-1.amazonaws.com"
+
+# DNS Configuration
+# Customize DNS resolution for redirecting traffic to proxy servers
+dnsPolicy: ""  # Options: ClusterFirst, Default, None, ClusterFirstWithHostNet
+dnsConfig: {}
+
+# Strategy for LibreChat deployment updates
+updateStrategy:
+  type: RollingUpdate
+
+# Extra ConfigMaps to be created alongside the main ones
+additionalConfigMaps: {}
+
+# MongoDB Parameters
+mongodb:
+  enabled: true
+  auth:
+    enabled: false
+  databases:
+   - LibreChat
+  image:
+    repository: bitnamilegacy/mongodb
+  persistence: 
+    size: 8Gi
+    storageClass: "csi-disk-topology"
+
+
+
+meilisearch:
+  enabled: true
+  persistence:
+    enabled: true
+    storageClass: "csi-disk-topology"
+  image:
+    tag: "v1.7.3"
+  auth:
+    # Use an existing Kubernetes secret for the MEILI_MASTER_KEY
+    existingMasterKeySecret: "librechat-secret-envs"
+
+# Redis Parameters
+redis:
+  enabled: false
+  architecture: standalone
+  auth:
+    enabled: false

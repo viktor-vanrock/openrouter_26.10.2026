@@ -1,0 +1,116 @@
+# Dockerfile.multi
+# v0.8.7
+
+ARG NODE_MAX_OLD_SPACE_SIZE=6144
+
+ARG BUILD_COMMIT=
+ARG BUILD_BRANCH=
+ARG BUILD_DATE=
+
+FROM node:24.16.0-alpine AS base-min
+ARG NPM_CI_TIMEOUT_SECONDS=1500
+ARG NPM_CI_ATTEMPTS=2
+RUN apk upgrade --no-cache
+RUN apk add --no-cache jemalloc
+ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
+
+WORKDIR /app
+RUN apk --no-cache add curl
+RUN npm config set fetch-retry-maxtimeout 600000 && \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 15000
+COPY package*.json ./
+COPY packages/data-provider/package*.json ./packages/data-provider/
+COPY packages/api/package*.json ./packages/api/
+COPY packages/data-schemas/package*.json ./packages/data-schemas/
+COPY packages/client/package*.json ./packages/client/
+COPY packages/prototype-worker/package*.json ./packages/prototype-worker/
+COPY apps/prototype-service/package*.json ./apps/prototype-service/
+COPY client/package*.json ./client/
+COPY api/package*.json ./api/
+
+FROM base-min AS base
+ARG NPM_CI_TIMEOUT_SECONDS=1500
+ARG NPM_CI_ATTEMPTS=2
+WORKDIR /app
+RUN attempt=1; \
+    until timeout "$NPM_CI_TIMEOUT_SECONDS" npm ci --no-audit --no-fund; do \
+      status=$?; \
+      if [ "$attempt" -ge "$NPM_CI_ATTEMPTS" ]; then \
+        exit "$status"; \
+      fi; \
+      echo "npm ci failed with exit code $status; retrying attempt $((attempt + 1))/$NPM_CI_ATTEMPTS"; \
+      attempt=$((attempt + 1)); \
+      npm cache clean --force || true; \
+      sleep 10; \
+    done
+
+# Fix for npm bug with optional dependencies (rollup on musl)
+RUN case "$(node -p process.arch)" in x64) task_build_cpu=x64 ;; arm64) task_build_cpu=arm64 ;; *) exit 1 ;; esac && \
+    npm install --no-save --no-audit --no-fund \
+      "@rollup/rollup-linux-${task_build_cpu}-musl" \
+      "@esbuild/linux-${task_build_cpu}"
+
+# Kaniko executes stages sequentially and unpacks/snapshots the complete
+# dependency tree for each FROM base. Keep compilation in one filesystem.
+FROM base AS build
+WORKDIR /app
+COPY turbo.json ./
+COPY packages/data-provider ./packages/data-provider
+COPY packages/data-schemas ./packages/data-schemas
+COPY packages/api ./packages/api
+COPY packages/prototype-worker ./packages/prototype-worker
+COPY packages/client ./packages/client
+COPY client ./client
+ARG NODE_MAX_OLD_SPACE_SIZE
+# Bound simultaneous compiler heaps on CI runners; tune with a build argument.
+ARG BUILD_CONCURRENCY=2
+ARG BUILD_MINIFIER=terser
+ARG TERSER_MAX_WORKERS=2
+ENV BUILD_MINIFIER=${BUILD_MINIFIER}
+ENV TERSER_MAX_WORKERS=${TERSER_MAX_WORKERS}
+ENV NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}"
+RUN npm run build -- --concurrency="$BUILD_CONCURRENCY"
+
+FROM base-min AS api-build
+ARG TARGETARCH
+ARG NPM_CI_TIMEOUT_SECONDS=1500
+ARG NPM_CI_ATTEMPTS=2
+RUN apk add --no-cache python3 py3-pip uv
+RUN uv --version
+WORKDIR /app
+RUN attempt=1; \
+    until timeout "$NPM_CI_TIMEOUT_SECONDS" npm ci --omit=dev --no-audit --no-fund; do \
+      status=$?; \
+      if [ "$attempt" -ge "$NPM_CI_ATTEMPTS" ]; then \
+        exit "$status"; \
+      fi; \
+      echo "npm ci --omit=dev failed with exit code $status; retrying attempt $((attempt + 1))/$NPM_CI_ATTEMPTS"; \
+      attempt=$((attempt + 1)); \
+      npm cache clean --force || true; \
+      sleep 10; \
+    done
+
+# 🔧 Fix for npm bug with optional deps — install sharp for musl
+RUN case "${TARGETARCH:-$(node -p process.arch)}" in amd64|x64) task_sharp_cpu=x64 ;; arm64) task_sharp_cpu=arm64 ;; *) exit 1 ;; esac && \
+    npm install --no-save --omit=dev --no-audit --no-fund --os=linux --libc=musl --cpu="$task_sharp_cpu" sharp@0.33.5
+
+COPY api ./api
+COPY apps/prototype-service/src/shared-storage-config.cjs ./apps/prototype-service/src/shared-storage-config.cjs
+COPY config ./config
+RUN mkdir -p ./skill ./api/logs ./uploads && chown -R 1000:2000 ./skill ./api/logs ./uploads
+COPY --from=build /app/packages/data-provider/dist ./packages/data-provider/dist
+COPY --from=build /app/packages/data-schemas/dist ./packages/data-schemas/dist
+COPY --from=build /app/packages/api/dist ./packages/api/dist
+COPY --from=build /app/packages/prototype-worker/dist ./packages/prototype-worker/dist
+COPY --from=build /app/client/dist ./client/dist
+ARG BUILD_COMMIT
+ARG BUILD_BRANCH
+ARG BUILD_DATE
+ENV BUILD_COMMIT=${BUILD_COMMIT}
+ENV BUILD_BRANCH=${BUILD_BRANCH}
+ENV BUILD_DATE=${BUILD_DATE}
+WORKDIR /app/api
+EXPOSE 3080
+ENV HOST=0.0.0.0
+CMD ["node", "server/index.js"]

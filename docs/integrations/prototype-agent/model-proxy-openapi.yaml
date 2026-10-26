@@ -1,0 +1,135 @@
+openapi: 3.1.0
+info:
+  title: Prototype Internal Model Proxy
+  version: 1.0.0
+  description: >-
+    Internal worker-to-Control-Plane contract. This interface is feature gated and requires a
+    short-lived Bearer job token issued for the active execution and lease. It is not a browser API.
+servers:
+  - url: /
+paths:
+  /internal/prototype-model/v1/chat/completions:
+    post:
+      operationId: createPrototypeChatCompletion
+      summary: Stream one completion for the immutable job model
+      description: >-
+        The proxy validates the Bearer job token and its active lease, discards any caller model,
+        and uses the forced modelId claim. The request body is limited to 16 KiB. Arbitrary
+        caller-supplied target URLs or headers are rejected and caller headers are never forwarded.
+      security:
+        - jobToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatCompletionRequest'
+      responses:
+        '200':
+          description: Streaming provider response; content is relayed without durable capture.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/CredentialsRequired'
+        '402':
+          $ref: '#/components/responses/FundsRequired'
+        '413':
+          $ref: '#/components/responses/InvalidRequest'
+        '422':
+          $ref: '#/components/responses/InvalidRequest'
+        '429':
+          $ref: '#/components/responses/RetryableFailure'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+components:
+  securitySchemes:
+    jobToken:
+      type: http
+      scheme: bearer
+      bearerFormat: RS256 JWT
+      description: Short-lived execution/revision/lease-scoped Bearer job token.
+  schemas:
+    ChatCompletionRequest:
+      type: object
+      additionalProperties: true
+      required: [messages]
+      properties:
+        model:
+          type: string
+          description: Ignored and replaced with the immutable modelId token claim.
+        messages:
+          type: array
+          maxItems: 256
+          items:
+            type: object
+            required: [role]
+            properties:
+              role:
+                type: string
+                enum: [system, developer, user, assistant, tool]
+              content: {}
+            additionalProperties: true
+        stream:
+          type: boolean
+          not:
+            const: false
+      not:
+        anyOf:
+          - required: [targetUrl]
+          - required: [url]
+          - required: [headers]
+          - required: [authorization]
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, retryable]
+          properties:
+            code:
+              type: string
+              enum:
+                - PROTOTYPE_WORKER_UNAUTHORIZED
+                - PROTOTYPE_INVALID_REQUEST
+                - credentials_required
+                - funds_required
+                - PROTOTYPE_RATE_LIMITED
+                - PROTOTYPE_SERVICE_UNAVAILABLE
+            retryable:
+              type: boolean
+  responses:
+    CredentialsRequired:
+      description: Token/credential failure; provider 401 emits a credentials pause event.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    FundsRequired:
+      description: Provider 402 emits a funds pause event.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    InvalidRequest:
+      description: Request shape, size, target, or header override is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    RetryableFailure:
+      description: Provider 429 or retryable 5xx normalized without raw provider content.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    ServiceUnavailable:
+      description: Safe normalized upstream or internal failure.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'

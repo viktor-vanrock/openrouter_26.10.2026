@@ -1,0 +1,21 @@
+deploy_GK_prod:
+  extends: .kube_deploy
+  stage: deploy
+  rules:
+    - !reference [.rules, rules]
+  tags: [cce-rndml-prod]  
+  dependencies:
+    - get_version
+    - build
+  variables:
+    APP_NAME: librechat
+    APP_NAMESPACE: openrouter-chat
+    CHART_DIR: './helm8/'
+    CHART_NAME: '.'
+    CHART_PATH: 'helm/librechat'
+    CHART_DEPENDENCY_DOWNLOAD: true
+    CHART_REPO: https://gitlab-ci-token:$CI_JOB_TOKEN@git.sberdevices.ru/rndml/devops/helm-template.git
+    CHART_REF: 'master'
+    CHART_VALUES: prod
+    ENVIRONMENT: prod
+    VALUES_PATH: envs/prod.yaml

@@ -1,0 +1,36 @@
+{
+  "name": "@librechat/prototype-service",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "start": "node src/entrypoint.js",
+    "start:orchestrator": "node src/orchestrator.js",
+    "start:model-gateway": "node src/model-gateway.js",
+    "start:dependency-gateway": "node src/dependency-gateway.js",
+    "test": "node --test",
+    "lint": "prettier --check \"src/**/*.{js,mjs,cjs}\" \"scripts/**/*.{js,mjs,cjs}\" \"test/**/*.{js,mjs,cjs}\" \"deploy/**/*.{js,mjs,cjs}\"",
+    "lint:fix": "prettier --write \"src/**/*.{js,mjs,cjs}\" \"scripts/**/*.{js,mjs,cjs}\" \"test/**/*.{js,mjs,cjs}\" \"deploy/**/*.{js,mjs,cjs}\"",
+    "dev:orchestrator": "NODE_ENV=development PROTOTYPE_SERVICE_ROLE=orchestrator PROTOTYPE_REQUIRE_SCHEDULER_CONFIG=1 node src/entrypoint.js",
+    "stop": "node scripts/stop-dev.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.980.0",
+    "@librechat/data-schemas": "*",
+    "@librechat/prototype-worker": "*",
+    "@smithy/node-http-handler": "^4.8.1",
+    "dotenv": "^16.0.3",
+    "ioredis": "^5.3.2",
+    "jszip": "^3.10.1",
+    "mongoose": "^8.23.1",
+    "parse5": "^7.3.0",
+    "typescript": "^5.0.4"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "yaml": "^2.8.2"
+  }
+}

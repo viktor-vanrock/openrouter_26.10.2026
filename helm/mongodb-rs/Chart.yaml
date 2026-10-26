@@ -1,0 +1,11 @@
+apiVersion: v2
+name: mongodb-rs
+description: MongoDB replica set, separate Helm release from the LibreChat standalone
+type: application
+version: 0.1.0
+appVersion: "8.0.13"
+
+dependencies:
+  - name: mongodb
+    version: "16.5.45"
+    repository: "https://mirror.yandex.ru/helm/charts.bitnami.com/"
