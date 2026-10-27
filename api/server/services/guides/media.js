@@ -64,8 +64,8 @@ function mediaDto(media) {
     url: signedMediaUrl(id),
     snippet:
       media.kind === 'image'
-        ? `<img src="media/${id}" alt="">`
-        : `<video controls preload="metadata" src="media/${id}"></video>`,
+        ? `<img src="media/${id}" alt="" width="480" style="max-width:100%;height:auto;display:block;margin:16px auto">`
+        : `<video controls preload="metadata" playsinline width="640" style="max-width:100%;height:auto;display:block;margin:16px auto" src="media/${id}"></video>`,
   };
 }
 

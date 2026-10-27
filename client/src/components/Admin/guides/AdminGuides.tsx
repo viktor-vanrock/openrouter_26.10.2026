@@ -304,7 +304,7 @@ export default function AdminGuides() {
       <div className="mx-auto w-full max-w-6xl">
         <div className="mb-7">
           <h1 className="text-3xl font-semibold tracking-tight text-text-primary">
-            Руководство к использованию
+            Инструкция по работе с сайтом
           </h1>
           <p className="mt-2 text-text-secondary">
             Загрузите HTML-страницы и откройте нужную для просмотра.
@@ -402,7 +402,7 @@ export default function AdminGuides() {
               <ChevronRight className="h-[34px] w-[34px]" />
             </button>
           )}
-          <div ref={sliderRef} className="flex w-full snap-x gap-5 overflow-x-auto pb-6 pt-2">
+          <div ref={sliderRef} className="flex w-full snap-x gap-5 overflow-hidden pb-6 pt-2">
             {isLoading && <p className="py-8 text-sm text-text-tertiary">Загрузка страниц…</p>}
             {!isLoading && guides.length === 0 && (
               <p className="py-8 text-sm text-text-tertiary">Пока нет страниц</p>

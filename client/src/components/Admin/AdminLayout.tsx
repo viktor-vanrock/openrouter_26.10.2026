@@ -7,7 +7,7 @@ import { hasDevelopingCookie } from '~/utils/developingCookie';
 const NAV_ITEMS = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/users', label: 'Users', icon: Users, end: false },
-  { to: '/admin/guides', label: 'Руководство к использованию', icon: BookOpen, end: false },
+  { to: '/admin/guides', label: 'Инструкция по работе с сайтом', icon: BookOpen, end: false },
 ];
 
 export const AdminLayout = () => {

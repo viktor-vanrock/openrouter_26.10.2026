@@ -28,33 +28,6 @@ import { useQueryClient } from '@tanstack/react-query';
 
 const imageMax = 5 * 1024 * 1024;
 const videoMax = 200 * 1024 * 1024;
-const demoColors = [
-  ['#f59e0b', '#fcd34d'],
-  ['#0f172a', '#64748b'],
-  ['#2563eb', '#93c5fd'],
-  ['#059669', '#6ee7b7'],
-  ['#be185d', '#f9a8d4'],
-  ['#7c3aed', '#c4b5fd'],
-  ['#ea580c', '#fdba74'],
-  ['#0891b2', '#67e8f9'],
-  ['#475569', '#cbd5e1'],
-  ['#dc2626', '#fca5a5'],
-];
-
-// Temporary images for checking the carousel layout while the media library is empty.
-const demoMedia: GuideMedia[] = demoColors.map(([from, to], index) => {
-  const number = String(index + 1).padStart(2, '0');
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 288"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><rect width="512" height="288" fill="url(#g)"/><circle cx="390" cy="72" r="52" fill="white" opacity=".35"/><path d="M0 250 145 92 275 232 360 140 512 280v8H0Z" fill="white" opacity=".28"/><text x="28" y="255" fill="white" font-family="sans-serif" font-size="64" font-weight="700">${number}</text></svg>`;
-  return {
-    id: `demo-${number}`,
-    kind: 'image',
-    name: `Тестовая картинка ${number}`,
-    size: 0,
-    createdAt: '',
-    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-    snippet: '',
-  };
-});
 
 type UploadState = {
   id: string;
@@ -69,6 +42,17 @@ function formatSize(size: number) {
   return size >= 1024 * 1024
     ? `${(size / 1024 / 1024).toFixed(1)} МБ`
     : `${Math.ceil(size / 1024)} КБ`;
+}
+
+type MediaSize = 'small' | 'medium' | 'large';
+const mediaWidths: Record<'image' | 'video', Record<MediaSize, number>> = {
+  image: { small: 320, medium: 480, large: 720 },
+  video: { small: 400, medium: 640, large: 880 },
+};
+
+function snippetWithSize(media: GuideMedia, size: MediaSize): string {
+  const width = mediaWidths[media.kind][size];
+  return media.snippet.replace(/\bwidth="\d+"/i, `width="${width}"`);
 }
 
 async function copyText(value: string) {
@@ -91,20 +75,19 @@ function MediaCard({
   media,
   onDelete,
   onRefresh,
-  demo = false,
 }: {
   media: GuideMedia;
   onDelete: (media: GuideMedia) => void;
   onRefresh: () => void;
-  demo?: boolean;
 }) {
   const { showToast } = useToastContext();
   const [copied, setCopied] = useState(false);
+  const [size, setSize] = useState<MediaSize>('medium');
   const [previewFailed, setPreviewFailed] = useState(false);
   useEffect(() => setPreviewFailed(false), [media.url]);
   const copy = async () => {
     try {
-      await copyText(media.snippet);
+      await copyText(snippetWithSize(media, size));
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
       showToast({ status: 'success', message: 'Код скопирован' });
@@ -154,31 +137,38 @@ function MediaCard({
           {media.name}
         </p>
         <p className="mt-1 text-xs text-text-secondary">
-          {demo
-            ? 'Тестовое изображение'
-            : `${formatSize(media.size)} · ${media.kind === 'image' ? 'Картинка' : 'Видео'}`}
+          {`${formatSize(media.size)} · ${media.kind === 'image' ? 'Картинка' : 'Видео'}`}
         </p>
+        <label className="mt-2 flex items-center gap-2 text-xs text-text-secondary">
+          <span>Размер</span>
+          <select
+            value={size}
+            onChange={(event) => setSize(event.target.value as MediaSize)}
+            className="min-w-0 rounded-md border border-border-light bg-surface-primary px-1.5 py-1 text-xs text-text-primary"
+            aria-label={`Размер файла ${media.name}`}
+          >
+            <option value="small">Малый</option>
+            <option value="medium">Средний</option>
+            <option value="large">Большой</option>
+          </select>
+        </label>
       </div>
-      {!demo && (
-        <>
-          <button
-            type="button"
-            onClick={() => onDelete(media)}
-            aria-label={`Удалить ${media.name}`}
-            className="absolute right-2 top-2 rounded-full bg-slate-800/85 p-2 text-white hover:bg-slate-950"
-          >
-            <Trash2 size={15} />
-          </button>
-          <button
-            type="button"
-            onClick={() => void copy()}
-            aria-label={`Скопировать код ${media.name}`}
-            className="absolute bottom-2 right-2 rounded-full bg-slate-800 p-2 text-white hover:bg-slate-950"
-          >
-            {copied ? <Check size={16} /> : <Copy size={16} />}
-          </button>
-        </>
-      )}
+      <button
+        type="button"
+        onClick={() => onDelete(media)}
+        aria-label={`Удалить ${media.name}`}
+        className="absolute right-2 top-2 rounded-full bg-slate-800/85 p-2 text-white hover:bg-slate-950"
+      >
+        <Trash2 size={15} />
+      </button>
+      <button
+        type="button"
+        onClick={() => void copy()}
+        aria-label={`Скопировать код ${media.name}`}
+        className="absolute bottom-2 right-2 rounded-full bg-slate-800 p-2 text-white hover:bg-slate-950"
+      >
+        {copied ? <Check size={16} /> : <Copy size={16} />}
+      </button>
     </article>
   );
 }
@@ -190,6 +180,8 @@ export default function GuideMediaLibrary() {
   const input = useRef<HTMLInputElement>(null);
   const rail = useRef<HTMLDivElement>(null);
   const [showArrows, setShowArrows] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [uploadHovered, setUploadHovered] = useState(false);
   const [uploads, setUploads] = useState<UploadState[]>([]);
   const [selectionErrors, setSelectionErrors] = useState<string[]>([]);
   const [toDelete, setToDelete] = useState<GuideMedia | null>(null);
@@ -313,12 +305,25 @@ export default function GuideMediaLibrary() {
         }}
       />
       <div
+        onMouseEnter={() => setUploadHovered(true)}
+        onMouseLeave={() => setUploadHovered(false)}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
         onDragOver={(event) => event.preventDefault()}
+        onDragLeave={(event) => {
+          if (event.currentTarget === event.target) setDragging(false);
+        }}
         onDrop={(event) => {
           event.preventDefault();
+          setDragging(false);
           void addFiles(Array.from(event.dataTransfer.files));
         }}
-        className="mt-4 rounded-2xl border-2 border-dashed border-slate-300 bg-[rgb(248_248_248)] p-8 text-center"
+        style={{ backgroundColor: dragging || uploadHovered ? '#f3f3f3' : undefined }}
+        className={`mt-4 rounded-2xl border-2 border-dashed bg-[rgb(248_248_248)] p-8 text-center transition-all duration-200 ${
+          dragging || uploadHovered ? 'scale-[1.01] border-slate-400' : 'border-slate-300'
+        }`}
       >
         <FileImage className="mx-auto text-slate-500" size={34} />
         <p className="mt-3 font-medium text-text-primary">Перетащите картинки или видео сюда</p>
@@ -384,25 +389,15 @@ export default function GuideMediaLibrary() {
             <ChevronLeft className="h-[34px] w-[34px]" />
           </button>
         )}
-        <div ref={rail} className="flex w-full snap-x gap-4 overflow-x-auto px-2 py-2">
-          {displayedMedia.length
-            ? displayedMedia.map((media) => (
-                <MediaCard
-                  key={media.id}
-                  media={media}
-                  onDelete={setToDelete}
-                  onRefresh={refreshMedia}
-                />
-              ))
-            : !isLoading && !isError && data && demoMedia.map((media) => (
-                <MediaCard
-                  key={media.id}
-                  media={media}
-                  onDelete={setToDelete}
-                  onRefresh={refreshMedia}
-                  demo
-                />
-              ))}
+        <div ref={rail} className="flex w-full snap-x gap-4 overflow-hidden px-2 py-2">
+          {displayedMedia.map((media) => (
+            <MediaCard
+              key={media.id}
+              media={media}
+              onDelete={setToDelete}
+              onRefresh={refreshMedia}
+            />
+          ))}
         </div>
         {showArrows && displayedMedia.length > 0 && (
           <button
@@ -445,6 +440,7 @@ export default function GuideMediaLibrary() {
           </li>
           <li>Сохраните. Превью сразу покажет файл.</li>
         </ol>
+        <p className="mt-2">Размер меняется числом width в скопированном теге.</p>
       </div>
       <OGDialog
         open={Boolean(toDelete)}
