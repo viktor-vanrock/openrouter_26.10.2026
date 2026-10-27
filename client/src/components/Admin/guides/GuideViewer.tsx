@@ -63,6 +63,19 @@ export default function GuideViewer({ mode }: { mode: 'published' | 'draft' }) {
 
   return (
     <div className="flex h-dvh w-full flex-col bg-white">
+      {mode === 'published' && (
+        <header className="hidden h-12 shrink-0 items-center border-b border-gray-200 bg-white px-3 max-[640px]:flex">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => navigate('/')}
+            className="gap-1"
+          >
+            <ArrowLeft size={16} /> Назад
+          </Button>
+        </header>
+      )}
       {mode === 'draft' && (
         <header className="flex h-12 shrink-0 items-center border-b border-gray-200 bg-white px-3">
           <Button

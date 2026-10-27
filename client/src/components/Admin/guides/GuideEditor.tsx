@@ -261,21 +261,25 @@ function GuideEditorInner({
             setMonacoMounted(true);
             setCodeOpen((open) => !open);
           }}
+          aria-label={codeOpen ? 'Скрыть код' : 'Открыть код'}
           className="shrink-0 gap-1"
         >
-          <Code size={16} /> {codeOpen ? 'Скрыть код' : 'Открыть код'}
-        </Button>
-        <Button type="button" disabled={!dirty || saving} onClick={() => void save()}>
-          {saving ? 'Сохранение…' : 'Сохранить'}
+          <Code size={16} />
+          <span className="max-[699px]:hidden">{codeOpen ? 'Скрыть код' : 'Открыть код'}</span>
         </Button>
         <Button
           type="button"
           size="sm"
           variant="outline"
           onClick={() => setMediaDialogOpen(true)}
+          aria-label="Выбрать картинку или видео"
           className="shrink-0 gap-1"
         >
-          <ImagePlus size={16} /> Выбрать картинку или видео
+          <ImagePlus size={16} />
+          <span className="max-[699px]:hidden">Выбрать картинку или видео</span>
+        </Button>
+        <Button type="button" disabled={!dirty || saving} onClick={() => void save()}>
+          {saving ? 'Сохранение…' : 'Сохранить'}
         </Button>
       </header>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

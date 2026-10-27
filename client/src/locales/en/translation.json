@@ -80,7 +80,7 @@
   "com_agents_mcp_description_placeholder": "Explain what it does in a few words",
   "com_agents_mcp_icon_size": "Minimum size 128 x 128 px",
   "com_agents_mcp_name_placeholder": "Custom Tool",
-  "com_agents_mcp_trust_subtext": "Custom connectors are not verified by OpenRouter Chat",
+  "com_agents_mcp_trust_subtext": "Custom connectors are not verified by ChatRouter",
   "com_agents_missing_name": "Please type in a name before creating an agent.",
   "com_agents_missing_provider_model": "Please select a provider and model before creating an agent.",
   "com_agents_web_search_model_selected": "For web search, the model has been changed to {{model}}.",

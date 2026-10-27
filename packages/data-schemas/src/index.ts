@@ -36,6 +36,7 @@ export {
   ensurePrototypeIndexes,
   ensureGuidePageIndexes,
   ensureGuideMediaIndexes,
+  ensureReleaseIndexes,
 } from './migrations';
 
 export { createPrototypeStoreModels } from './models/prototypeStore';

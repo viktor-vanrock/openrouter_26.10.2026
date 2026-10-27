@@ -97,7 +97,7 @@ const sendEmail = async ({ email, subject, payload, template, throwError = true 
     const html = compiledTemplate(payload);
 
     // Prepare common email data
-    const fromName = process.env.EMAIL_FROM_NAME || process.env.APP_TITLE;
+    const fromName = 'ChatRouter';
     const fromEmail = process.env.EMAIL_FROM;
     const fromAddress = `"${fromName}" <${fromEmail}>`;
     const toAddress = `"${payload.name}" <${email}>`;

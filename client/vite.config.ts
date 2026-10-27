@@ -118,8 +118,8 @@ export default defineConfig(({ command }) => ({
       },
       includeAssets: [],
       manifest: {
-        name: 'OpenRouter Chat',
-        short_name: 'OpenRouter Chat',
+        name: 'ChatRouter',
+        short_name: 'ChatRouter',
         display: 'standalone',
         background_color: '#000000',
         theme_color: '#009688',

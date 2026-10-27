@@ -3,6 +3,7 @@ const {
   logger,
   ensurePrototypeIndexes,
   ensureGuidePageIndexes,
+  ensureReleaseIndexes,
 } = require('@librechat/data-schemas');
 const {
   logAgentMigrationWarning,
@@ -19,6 +20,7 @@ const { findRoleByIdentifier } = require('~/models');
 async function checkMigrations() {
   await ensurePrototypeIndexes(mongoose.connection);
   await ensureGuidePageIndexes(mongoose.connection);
+  await ensureReleaseIndexes(mongoose.connection);
   // Keep startup compatible with a workspace whose data-schemas package has not yet
   // been rebuilt: server code resolves that package from its generated dist files.
   const guideMediaCollection = mongoose.connection.db.collection('guidemedias');

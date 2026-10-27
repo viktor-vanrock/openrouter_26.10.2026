@@ -262,6 +262,7 @@ const startServer = async () => {
   app.use('/api/admin/message-stats', routes.adminMessageStats);
   app.use('/api/admin/model-share', routes.adminModelShare);
   app.use('/api/admin/guides', routes.adminGuides);
+  app.use('/api/admin/releases', routes.adminReleases);
   if (logsRoutes) {
     const { requireAdmin } = pkg;
     app.use('/api/admin/logs', requireJwtAuth, requireAdmin, logsRoutes);
@@ -272,6 +273,7 @@ const startServer = async () => {
   app.use('/api/user', routes.user);
   app.use('/api/search', routes.search);
   app.use('/api/openrouter', requireJwtAuth, openrouterBalanceRoutes);
+  app.use('/api/openrouter', requireJwtAuth, routes.openrouterPricing);
   app.use('/api/messages', routes.messages);
   app.use('/api/convos', routes.convos);
   app.use('/api/conversations', routes.prototypes.conversations);
@@ -309,6 +311,7 @@ const startServer = async () => {
   app.use('/api/agents', routes.agents);
   app.use('/api/banner', routes.banner);
   app.use('/api/guides', routes.guides);
+  app.use('/api/releases', routes.releases);
   app.use('/api/memories', routes.memories);
   app.use('/api/permissions', routes.accessPermissions);
 

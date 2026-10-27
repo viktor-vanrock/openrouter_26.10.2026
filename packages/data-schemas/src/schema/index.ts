@@ -41,3 +41,5 @@ export { default as prototypeGatewayExecutionSchema } from './prototypeGatewayEx
 export { default as prototypeGenerationSchema } from './prototypeGeneration';
 export { default as guidePageSchema } from './guidePage';
 export { default as guideMediaSchema } from './guideMedia';
+export { default as releaseSchema } from './release';
+export { default as userReleaseStateSchema } from './userReleaseState';

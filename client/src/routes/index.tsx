@@ -27,6 +27,7 @@ import { AdminDashboard } from '~/components/Admin/pages/Dashboard';
 import { AdminUsers } from '~/components/Admin/pages/Users';
 import AdminGuides from '~/components/Admin/guides/AdminGuides';
 import GuideViewer from '~/components/Admin/guides/GuideViewer';
+import { hasDevelopingCookie } from '~/utils/developingCookie';
 
 const AuthLayout = () => (
   <AuthContextProvider>
@@ -51,6 +52,15 @@ const loadGuideEditor = () =>
   import('~/components/Admin/guides/GuideEditor').then((m) => ({
     Component: m.default,
   }));
+
+const loadAdminReleases = () => {
+  if (!hasDevelopingCookie()) {
+    return Promise.resolve({ Component: () => <Navigate to="/admin" replace /> });
+  }
+  return import('~/components/Admin/releases/AdminReleases').then((m) => ({
+    Component: m.default,
+  }));
+};
 
 const baseEl = document.querySelector('base');
 const baseHref = baseEl?.getAttribute('href') || '/';
@@ -130,6 +140,7 @@ export const router = createBrowserRouter(
                 { path: 'users', element: <AdminUsers /> },
                 { path: 'guides', element: <AdminGuides /> },
                 { path: 'guides/:id/edit', lazy: loadGuideEditor },
+                { path: 'releases', lazy: loadAdminReleases },
               ],
             },
           ],
