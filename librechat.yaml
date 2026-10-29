@@ -1,4 +1,15 @@
 version: 1.3.6
+mcpServers:
+  github:
+    type: streamable-http
+    url: https://api.githubcopilot.com/mcp/
+    requiresOAuth: false
+    headers:
+      Authorization: "Bearer {{GITHUB_PAT}}"
+    customUserVars:
+      GITHUB_PAT:
+        title: "Твой GitHub токен"
+        description: "Создай на github.com/settings/tokens, достаточно прав на чтение"
 cache: true
 
 # Redis connections and S3 credentials are read from the root .env.
@@ -155,9 +166,9 @@ interface:
   # Скрыть пункт "Магазин агентов" (Marketplace)
   marketplace:
     use: true
-  # Скрыть MCP сервера в выпадающем меню чата (оставит их доступными только для агентов)
+  # Показывать MCP серверы в меню чата
   mcpServers:
-    use: false
+    use: true
     create: false
     share: false
     public: false

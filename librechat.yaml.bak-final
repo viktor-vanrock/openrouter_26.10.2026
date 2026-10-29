@@ -1,0 +1,180 @@
+version: 1.3.6
+mcpServers:
+  github:
+    type: streamable-http
+    url: http://localhost:9999/
+    requiresOAuth: false
+    headers:
+      Authorization: "Bearer ${GITHUB_PAT}"
+mcpSettings:
+  allowedAddresses:
+    - 'localhost:9999'
+cache: true
+
+# Redis connections and S3 credentials are read from the root .env.
+# cache controls YAML config caching; USE_REDIS / REDIS_URI enable Redis itself.
+# S3-compatible file storage uses AWS_* from .env; prototype artifacts use the same AWS_* settings.
+fileStrategy: "s3"
+
+# Ordinary chat prototype mode; the legacy local-only page is disabled.
+# Gateway execution is configured in .env; service launcher wiring is tracked in T001/T004.
+prototypeAgent:
+  enabled: true
+  # OpenRouter-compatible model provider; separate from Sandbox Gateway execution.
+  modelPolicy:
+    version: "gateway-react-v1"
+    blockedPatterns: []
+    # Direct React baseline has no tools; require capability verification before OpenCode rollout.
+    requireToolCalling: false
+    unknownModelPolicy: "warn"
+  # Unknown prices remain unknown; show actual provider usage when available.
+  costDefaults: {}
+  redisStreamPrefix: "prototype"
+  storage:
+    driver: "s3"
+    root: "prototype"
+  preview:
+    # The application/backend origin; keep aligned with DOMAIN_SERVER.
+    origin: "http://localhost:3080"
+    ticketTtlSeconds: 60
+
+registration:
+  socialLogins: []
+  
+endpoints:
+  custom:
+    - name: "OpenRouter"
+      # Для проброса ключа из интерфейса
+      apiKey: "user_provided"
+      userProvide: true
+      userKeyExpiry: "2099-01-01T00:00:00.000Z"
+      baseURL: "https://or.crbrcloud.ru/api/v1"
+      # headers:
+      #   "Accept-Encoding": "gzip"
+      models:
+        default: ["openai/gpt-4o"]
+        fetch: true                              
+      titleConvo: true
+      titleModel: "openai/gpt-4o"
+      dropParams: ["stop"]
+      modelDisplayLabel: "OpenRouter"
+  agents:
+      disableBuilder: false
+      recursionLimit: 25
+      maxRecursionLimit: 50
+      capabilities:
+        - "file_search"
+        - "actions"
+        - "tools"
+        - "skills"
+        - "web_search"
+        - "ocr"
+        - "chain"
+
+webSearch:
+  searchProvider: tavily
+  scraperProvider: tavily
+  tavilyApiKey: '${TAVILY_API_KEY}'
+  rerankerType: none
+  safeSearch: 1
+
+fileConfig:
+  endpoints:
+    custom:
+      # Лимит на количество загруженных файлов
+      fileLimit: 5
+      supportedMimeTypes:
+        # Текстовые файлы
+        - "text/plain"
+        - "text/csv"
+        - "text/markdown"
+        - "application/json"
+        # Документы
+        - "application/pdf"
+        - "application/msword"
+        - "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        - "application/vnd.ms-excel"
+        - "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        - "application/vnd.ms-powerpoint"
+        - "application/vnd.oasis.opendocument.presentation"
+        - "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        - "application/rtf"
+        # Изображения
+        - "image/jpeg"
+        - "image/png"
+        - "image/gif"
+        - "image/webp"
+        - "image/bmp"
+        - "image/tiff"
+    default:
+      fileLimit: 5
+  
+  # OCR настройки (для документов и изображений)
+  ocr:
+    supportedMimeTypes:
+      # Документы
+      - "application/pdf"
+      - "application/msword"
+      - "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      - "application/vnd.ms-excel"
+      - "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      - "application/vnd.ms-powerpoint"
+      - "application/vnd.oasis.opendocument.presentation"
+      - "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      - "application/rtf"
+      - "text/plain"
+      - "text/csv"
+      # Изображения
+      - "image/jpeg"
+      - "image/png"
+      - "image/gif"
+      - "image/webp"
+      - "image/bmp"
+      - "image/tiff"
+  
+  # Текстовый парсер
+  text:
+    supportedMimeTypes:
+      - "text/plain"
+      - "text/csv"
+      - "text/markdown"
+      - "application/json"
+      - "application/javascript"
+      - "application/typescript"
+      - "text/css"
+      - "text/x-python"
+      - "text/x-java"
+      - "text/x-c"
+      - "text/x-cpp"
+      - "text/x-sh"
+      - "text/x-sql"
+      - "application/x-yaml"
+      - "text/x-pascal"
+      - "text/x-rust"
+      - "text/x-go"
+
+interface:
+  # Включить режим запроса в нескольких экранах
+  multiConvo: true
+  bookmarks: false
+  parameters: false
+  presets: false
+  prompts: false
+  # Скрыть пункт "Агенты" в боковом меню
+  agents: true
+  # Скрыть пункт "Магазин агентов" (Marketplace)
+  marketplace:
+    use: true
+  # Показывать MCP серверы в меню чата
+  mcpServers:
+    use: true
+    create: false
+    share: false
+    public: false
+memory:
+  disabled: true
+# Полное отключение MCP в интерфейсе обычного чата
+# mcpServers:
+#   # Убирает MCP сервера из меню выбора под строкой ввода сообщения
+#   chatMenu:
+#     use: false
