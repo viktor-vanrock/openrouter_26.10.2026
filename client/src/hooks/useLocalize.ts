@@ -4,6 +4,7 @@ import { useRecoilValue } from 'recoil';
 import { useTranslation } from 'react-i18next';
 import { resources } from '~/locales/i18n';
 import store from '~/store';
+import { withChatRouterBrand } from '~/utils/brand';
 
 export type TranslationKeys = keyof typeof resources.en.translation;
 
@@ -18,7 +19,7 @@ export default function useLocalize() {
   }, [lang, i18n]);
 
   return useCallback(
-    (phraseKey: TranslationKeys, options?: TOptions) => t(phraseKey, options),
+    (phraseKey: TranslationKeys, options?: TOptions) => withChatRouterBrand(t(phraseKey, options)),
     [t],
   );
 }

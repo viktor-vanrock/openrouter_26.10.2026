@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom';
+import type { ReactNode } from 'react';
 import { getConfigDefaults } from 'librechat-data-provider';
 import { useGetStartupConfig } from '~/data-provider';
 import ExportAndShareMenu from './ExportAndShareMenu';
@@ -19,6 +20,7 @@ export function MobileAccordionPanel({
   hasAccessToTemporaryChat,
   startupConfig,
   isNeedShareMenu,
+  guideActions,
 }: {
   open: boolean;
   onClose: () => void;
@@ -28,6 +30,7 @@ export function MobileAccordionPanel({
   hasAccessToTemporaryChat: boolean;
   startupConfig: ReturnType<typeof useGetStartupConfig>['data'];
   isNeedShareMenu: boolean;
+  guideActions: ReactNode;
 }) {
   return createPortal(
     <>
@@ -35,10 +38,10 @@ export function MobileAccordionPanel({
       <div
         className={cn(
           'fixed bottom-0 left-0 right-0 z-50 overflow-hidden transition-[max-height] duration-300 ease-in-out',
-          open ? 'max-h-[600px]' : 'max-h-0',
+          open ? 'max-h-[80vh]' : 'max-h-0',
         )}
       >
-        <div className="flex flex-col border-t border-border-light bg-surface-primary text-text-primary shadow-xl">
+        <div className="flex max-h-[80vh] flex-col overflow-y-auto border-t border-border-light bg-surface-primary text-text-primary shadow-xl">
           {interfaceConfig.presets === true && interfaceConfig.modelSelect && (
             <div
               className="flex min-h-[60px] items-center border-b border-border-light px-4"
@@ -69,6 +72,7 @@ export function MobileAccordionPanel({
           >
             <OpenrouterButton isNeedButton={false} />
           </div>
+          {guideActions}
           {isNeedShareMenu && (
             <>
               <div

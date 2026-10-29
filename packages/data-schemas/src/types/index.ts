@@ -40,3 +40,6 @@ export * from './web';
 export * from './mcp';
 /* Prototype Agent */
 export * from './prototype';
+export * from './guidePage';
+export * from './guideMedia';
+export * from './release';

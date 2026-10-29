@@ -9,6 +9,7 @@ import { CustomMenuItem as MenuItem } from '../CustomMenu';
 import { cn } from '~/utils';
 import { PinnedButton } from './PinedButton';
 import { FixedSizeList as List } from 'react-window';
+import ModelPriceLabel from '../ModelPriceLabel';
 
 interface EndpointModelItemProps {
   modelId: string | null;
@@ -104,18 +105,20 @@ export function EndpointModelItem({ modelId, endpoint }: EndpointModelItemProps)
       aria-selected={isSelected || undefined}
       className="group flex w-[98%] w-full cursor-pointer items-center justify-between rounded-lg pl-[12px] text-sm"
     >
-      <div className="flex w-full min-w-0 items-center gap-2 py-1">
+      <div className="flex min-w-0 flex-1 items-center gap-2 py-1">
         {renderAvatar()}
-        <span className="truncate">{modelName}</span>
+        <span className="min-w-0 truncate">{modelName}</span>
         {isGlobal && <EarthIcon className="ml-1 size-4 text-surface-submit" />}
       </div>
-      <PinnedButton isFavorite={isFavorite} onClick={handleFavoriteClick} />
+      <ModelPriceLabel modelId={modelId} endpoint={endpoint.value} />
       {isSelected && (
         <>
           <CheckCircle2 className="mr-1 size-5 shrink-0 text-text-primary" aria-hidden="true" />
           <VisuallyHidden>{localize('com_a11y_selected')}</VisuallyHidden>
         </>
       )}
+      {!isSelected && <span className="mr-1 size-5 shrink-0" aria-hidden="true" />}
+      <PinnedButton isFavorite={isFavorite} onClick={handleFavoriteClick} />
     </MenuItem>
   );
 }
@@ -152,17 +155,20 @@ export function renderEndpointModels(
   }));
 
   return (
-    <List
-      height={420}
-      width={390}
-      itemCount={items.length}
-      itemSize={40}
-      itemData={{
-        items,
-        indexSuffix,
-      }}
-    >
-      {Row}
-    </List>
+    <div className="min-h-0 w-full flex-1">
+      <List
+        className="!h-full w-full"
+        height={400}
+        width="100%"
+        itemCount={items.length}
+        itemSize={40}
+        itemData={{
+          items,
+          indexSuffix,
+        }}
+      >
+        {Row}
+      </List>
+    </div>
   );
 }

@@ -1,0 +1,32 @@
+{{- if .Values.guidesMediaIngress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "librechat.fullname" . }}-guides-media
+  labels:
+    {{- include "librechat.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "210m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+spec:
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.guidesMediaIngress.hosts }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+          - path: /api/admin/guides/media
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "librechat.fullname" $ }}
+                port:
+                  number: {{ $.Values.service.port }}
+    {{- end }}
+{{- end }}

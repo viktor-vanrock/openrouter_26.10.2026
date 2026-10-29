@@ -11,6 +11,7 @@ import {
 import type { TStartupConfig, TUser } from 'librechat-data-provider';
 import { useMCPToolsQuery, useMCPServersQuery } from '~/data-provider';
 import { cleanupTimestampedStorage } from '~/utils/timestamps';
+import { APP_NAME } from '~/utils/brand';
 import useSpeechSettingsInit from './useSpeechSettingsInit';
 import { useHasAccess } from '~/hooks';
 import store from '~/store';
@@ -49,12 +50,8 @@ export default function useAppStartup({
 
   /** Set the app title */
   useEffect(() => {
-    const appTitle = startupConfig?.appTitle ?? '';
-    if (!appTitle) {
-      return;
-    }
-    document.title = appTitle;
-    localStorage.setItem(LocalStorageKeys.APP_TITLE, appTitle);
+    document.title = APP_NAME;
+    localStorage.setItem(LocalStorageKeys.APP_TITLE, APP_NAME);
   }, [startupConfig]);
 
   /** Set the default spec's preset as default */

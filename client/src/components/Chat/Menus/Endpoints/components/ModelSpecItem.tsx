@@ -8,6 +8,7 @@ import { CustomMenuItem as MenuItem } from '../CustomMenu';
 import SpecIcon from './SpecIcon';
 import { cn } from '~/utils';
 import { PinnedButton } from './PinedButton';
+import ModelPriceLabel from '../ModelPriceLabel';
 
 interface ModelSpecItemProps {
   spec: TModelSpec;
@@ -38,7 +39,7 @@ export function ModelSpecItem({ spec, isSelected }: ModelSpecItemProps) {
     >
       <div
         className={cn(
-          'flex w-full min-w-0 gap-2 px-1 py-1',
+          'flex min-w-0 flex-1 gap-2 px-1 py-1',
           spec.description ? 'items-start' : 'items-center',
         )}
       >
@@ -47,14 +48,14 @@ export function ModelSpecItem({ spec, isSelected }: ModelSpecItemProps) {
             <SpecIcon currentSpec={spec} endpointsConfig={endpointsConfig} />
           </div>
         )}
-        <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="truncate text-left">{spec.label}</span>
           {spec.description && (
             <span className="break-words text-xs font-normal">{spec.description}</span>
           )}
         </div>
       </div>
-      <PinnedButton onClick={handleFavoriteClick} isFavorite={isFavorite} />
+      <ModelPriceLabel modelId={spec.preset.model} endpoint={spec.preset.endpoint} />
       {isSelected && (
         <>
           <CheckCircle2
@@ -64,6 +65,8 @@ export function ModelSpecItem({ spec, isSelected }: ModelSpecItemProps) {
           <VisuallyHidden>{localize('com_a11y_selected')}</VisuallyHidden>
         </>
       )}
+      {!isSelected && <span className="size-4 shrink-0" aria-hidden="true" />}
+      <PinnedButton onClick={handleFavoriteClick} isFavorite={isFavorite} />
     </MenuItem>
   );
 }

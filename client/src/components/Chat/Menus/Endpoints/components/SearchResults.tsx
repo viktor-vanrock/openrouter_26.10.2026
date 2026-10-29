@@ -10,6 +10,7 @@ import SpecIcon from './SpecIcon';
 import { cn } from '~/utils';
 import { PinnedButton } from './PinedButton';
 import { useFavorites } from '~/hooks';
+import ModelPriceLabel from '../ModelPriceLabel';
 
 interface SearchResultsProps {
   results: (TModelSpec | Endpoint)[] | null;
@@ -92,7 +93,7 @@ export function SearchResults({ results, localize, searchValue }: SearchResultsP
             >
               <div
                 className={cn(
-                  'flex w-full min-w-0 gap-2 px-1 py-1',
+                  'flex min-w-0 flex-1 gap-2 px-1 py-1',
                   spec.description ? 'items-start' : 'items-center',
                 )}
               >
@@ -101,13 +102,14 @@ export function SearchResults({ results, localize, searchValue }: SearchResultsP
                     <SpecIcon currentSpec={spec} endpointsConfig={endpointsConfig} />
                   </div>
                 )}
-                <div className="flex min-w-0 flex-col gap-1">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="truncate text-left">{spec.label}</span>
                   {spec.description && (
                     <span className="break-words text-xs font-normal">{spec.description}</span>
                   )}
                 </div>
               </div>
+              <ModelPriceLabel modelId={spec.preset.model} endpoint={spec.preset.endpoint} />
               {selectedSpec === spec.name && (
                 <>
                   <CheckCircle2
@@ -119,6 +121,9 @@ export function SearchResults({ results, localize, searchValue }: SearchResultsP
                   />
                   <VisuallyHidden>{localize('com_a11y_selected')}</VisuallyHidden>
                 </>
+              )}
+              {selectedSpec !== spec.name && (
+                <span className="size-4 shrink-0" aria-hidden="true" />
               )}
             </MenuItem>
           );
@@ -245,7 +250,7 @@ export function SearchResults({ results, localize, searchValue }: SearchResultsP
                         index === 0 ? 'mb-[4px]' : 'my-[4px]',
                       )}
                     >
-                      <div className="group flex w-full items-center justify-between gap-2">
+                      <div className="group flex min-w-0 flex-1 items-center gap-2">
                         {endpoint.modelIcons?.[modelId] && (
                           <div className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full">
                             <img
@@ -255,17 +260,12 @@ export function SearchResults({ results, localize, searchValue }: SearchResultsP
                             />
                           </div>
                         )}
-                        <span>{modelName}</span>
-                        <PinnedButton
-                          onClick={(e: React.MouseEvent) =>
-                            handleFavoriteClick(e, modelName, endpoint)
-                          }
-                          isFavorite={isFavorite}
-                        />
+                        <span className="min-w-0 truncate">{modelName}</span>
                       </div>
                       {isGlobal && (
                         <EarthIcon className="ml-auto size-4 text-green-400" aria-hidden="true" />
                       )}
+                      <ModelPriceLabel modelId={modelId} endpoint={endpoint.value} />
                       {isModelSelected && (
                         <>
                           <CheckCircle2
@@ -275,6 +275,13 @@ export function SearchResults({ results, localize, searchValue }: SearchResultsP
                           <VisuallyHidden>{localize('com_a11y_selected')}</VisuallyHidden>
                         </>
                       )}
+                      {!isModelSelected && <span className="size-5 shrink-0" aria-hidden="true" />}
+                      <PinnedButton
+                        onClick={(e: React.MouseEvent) =>
+                          handleFavoriteClick(e, modelName, endpoint)
+                        }
+                        isFavorite={isFavorite}
+                      />
                     </MenuItem>
                   );
                 })}

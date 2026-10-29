@@ -15,6 +15,8 @@ import { useGetEndpointsQuery, useListAgentsQuery } from '~/data-provider';
 import { useModelSelectorChatContext } from './ModelSelectorChatContext';
 import useSelectMention from '~/hooks/Input/useSelectMention';
 import { filterItems } from './utils';
+import { useModelPrices } from './modelPricing';
+import type { ModelPrice } from './modelPricing';
 
 type ModelSelectorContextType = {
   // State
@@ -28,6 +30,7 @@ type ModelSelectorContextType = {
   agentsMap: t.TAgentsMap | undefined;
   assistantsMap: t.TAssistantsMap | undefined;
   endpointsConfig: t.TEndpointsConfig;
+  modelPrices: Record<string, ModelPrice>;
 
   // Functions
   endpointRequiresUserKey: (endpoint: string) => boolean;
@@ -58,6 +61,7 @@ export function ModelSelectorProvider({ children, startupConfig }: ModelSelector
   const agentsMap = useAgentsMapContext();
   const assistantsMap = useAssistantsMapContext();
   const { data: endpointsConfig } = useGetEndpointsQuery();
+  const { data: modelPrices = {} } = useModelPrices();
   const { endpoint, model, spec, agent_id, assistant_id, getConversation, newConversation } =
     useModelSelectorChatContext();
   const localize = useLocalize();
@@ -251,6 +255,7 @@ export function ModelSelectorProvider({ children, startupConfig }: ModelSelector
       assistantsMap,
       mappedEndpoints,
       endpointsConfig,
+      modelPrices,
       handleSelectSpec,
       handleSelectModel,
       setSelectedValues,
@@ -270,6 +275,7 @@ export function ModelSelectorProvider({ children, startupConfig }: ModelSelector
       assistantsMap,
       mappedEndpoints,
       endpointsConfig,
+      modelPrices,
       handleSelectSpec,
       handleSelectModel,
       setSelectedValues,

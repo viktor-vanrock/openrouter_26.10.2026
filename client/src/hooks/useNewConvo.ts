@@ -24,6 +24,7 @@ import type {
   TEndpointsConfig,
 } from 'librechat-data-provider';
 import type { AssistantListItem } from '~/common';
+import { APP_NAME } from '~/utils/brand';
 import {
   updateLastSelectedModel,
   getLocalStorageItems,
@@ -231,10 +232,7 @@ const useNewConvo = (index = 0) => {
         const getParams = () => (searchParamsString ? `?${searchParamsString}` : '');
 
         if (conversation.conversationId === Constants.NEW_CONVO && !modelsData) {
-          const appTitle = localStorage.getItem(LocalStorageKeys.APP_TITLE) ?? '';
-          if (appTitle) {
-            document.title = appTitle;
-          }
+          document.title = APP_NAME;
           const path = `/c/${Constants.NEW_CONVO}${getParams()}`;
           navigate(path, { state: { focusChat: true } });
           return;
