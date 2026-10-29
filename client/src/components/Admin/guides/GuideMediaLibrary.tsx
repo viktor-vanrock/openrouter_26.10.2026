@@ -6,6 +6,7 @@ import {
   Copy,
   FileImage,
   FileVideo,
+  Loader2,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -18,8 +19,10 @@ import {
 } from '@librechat/client';
 import {
   deleteGuideMedia,
+  guideMediaSnippet,
   guideKeys,
   type GuideMedia,
+  type GuideMediaSize,
   uploadGuideMedia,
   useGuideMedia,
 } from './api';
@@ -42,17 +45,6 @@ function formatSize(size: number) {
   return size >= 1024 * 1024
     ? `${(size / 1024 / 1024).toFixed(1)} МБ`
     : `${Math.ceil(size / 1024)} КБ`;
-}
-
-type MediaSize = 'small' | 'medium' | 'large';
-const mediaWidths: Record<'image' | 'video', Record<MediaSize, number>> = {
-  image: { small: 320, medium: 480, large: 720 },
-  video: { small: 400, medium: 640, large: 880 },
-};
-
-function snippetWithSize(media: GuideMedia, size: MediaSize): string {
-  const width = mediaWidths[media.kind][size];
-  return media.snippet.replace(/\bwidth="\d+"/i, `width="${width}"`);
 }
 
 async function copyText(value: string) {
@@ -82,12 +74,12 @@ function MediaCard({
 }) {
   const { showToast } = useToastContext();
   const [copied, setCopied] = useState(false);
-  const [size, setSize] = useState<MediaSize>('medium');
+  const [size, setSize] = useState<GuideMediaSize>('medium');
   const [previewFailed, setPreviewFailed] = useState(false);
   useEffect(() => setPreviewFailed(false), [media.url]);
   const copy = async () => {
     try {
-      await copyText(snippetWithSize(media, size));
+      await copyText(guideMediaSnippet(media, size));
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
       showToast({ status: 'success', message: 'Код скопирован' });
@@ -143,7 +135,7 @@ function MediaCard({
           <span>Размер</span>
           <select
             value={size}
-            onChange={(event) => setSize(event.target.value as MediaSize)}
+            onChange={(event) => setSize(event.target.value as GuideMediaSize)}
             className="min-w-0 rounded-md border border-border-light bg-surface-primary px-1.5 py-1 text-xs text-text-primary"
             aria-label={`Размер файла ${media.name}`}
           >
@@ -178,6 +170,7 @@ export default function GuideMediaLibrary() {
   const queryClient = useQueryClient();
   const { showToast } = useToastContext();
   const input = useRef<HTMLInputElement>(null);
+  const deleteInFlight = useRef(false);
   const rail = useRef<HTMLDivElement>(null);
   const [showArrows, setShowArrows] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -185,6 +178,7 @@ export default function GuideMediaLibrary() {
   const [uploads, setUploads] = useState<UploadState[]>([]);
   const [selectionErrors, setSelectionErrors] = useState<string[]>([]);
   const [toDelete, setToDelete] = useState<GuideMedia | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [usage, setUsage] = useState<Array<{ id: string; title: string }> | null>(null);
   const displayedMedia = data?.media ?? [];
   useEffect(() => {
@@ -273,7 +267,9 @@ export default function GuideMediaLibrary() {
   };
 
   const remove = async (force = false) => {
-    if (!toDelete) return;
+    if (!toDelete || deleteInFlight.current) return;
+    deleteInFlight.current = true;
+    setDeleting(true);
     try {
       await deleteGuideMedia(toDelete.id, force);
       setToDelete(null);
@@ -286,6 +282,9 @@ export default function GuideMediaLibrary() {
       };
       if (response.response?.status === 409) setUsage(response.response.data?.pages ?? []);
       else showToast({ status: 'error', message: getErrorMessage(error) });
+    } finally {
+      setDeleting(false);
+      deleteInFlight.current = false;
     }
   };
 
@@ -445,7 +444,7 @@ export default function GuideMediaLibrary() {
       <OGDialog
         open={Boolean(toDelete)}
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && !deleting) {
             setToDelete(null);
             setUsage(null);
           }
@@ -462,6 +461,7 @@ export default function GuideMediaLibrary() {
                 <Button
                   type="button"
                   variant="outline"
+                  disabled={deleting}
                   onClick={() => {
                     setToDelete(null);
                     setUsage(null);
@@ -469,8 +469,18 @@ export default function GuideMediaLibrary() {
                 >
                   Отмена
                 </Button>
-                <Button type="button" variant="destructive" onClick={() => void remove(true)}>
-                  Удалить всё равно
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={deleting}
+                  onClick={() => void remove(true)}
+                  aria-label={deleting ? 'Удаление файла' : 'Удалить файл всё равно'}
+                >
+                  {deleting ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    'Удалить всё равно'
+                  )}
                 </Button>
               </div>
             </div>
@@ -480,11 +490,26 @@ export default function GuideMediaLibrary() {
                 «{toDelete?.name}» будет удалён без возможности восстановления.
               </p>
               <div className="mt-5 flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setToDelete(null)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={deleting}
+                  onClick={() => setToDelete(null)}
+                >
                   Отмена
                 </Button>
-                <Button type="button" variant="destructive" onClick={() => void remove()}>
-                  Удалить
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={deleting}
+                  onClick={() => void remove()}
+                  aria-label={deleting ? 'Удаление файла' : 'Удалить файл'}
+                >
+                  {deleting ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    'Удалить'
+                  )}
                 </Button>
               </div>
             </div>

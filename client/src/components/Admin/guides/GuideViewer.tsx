@@ -28,7 +28,9 @@ export default function GuideViewer({ mode }: { mode: 'published' | 'draft' }) {
 
   useEffect(() => {
     let cancelled = false;
+    let latestRequest = 0;
     const load = async (withLoading = true) => {
+      const requestId = ++latestRequest;
       if (withLoading) setStatus('loading');
       try {
         const result =
@@ -40,11 +42,11 @@ export default function GuideViewer({ mode }: { mode: 'published' | 'draft' }) {
                 media: guide.media,
                 mediaOrigin: guide.mediaOrigin,
               }));
-        if (cancelled) return;
+        if (cancelled || requestId !== latestRequest) return;
         setDocument(result);
         setStatus('ready');
       } catch (error) {
-        if (!cancelled) {
+        if (!cancelled && requestId === latestRequest) {
           setStatus(
             (error as { response?: { status?: number } })?.response?.status === 404
               ? 'empty'
@@ -54,10 +56,23 @@ export default function GuideViewer({ mode }: { mode: 'published' | 'draft' }) {
       }
     };
     void load();
-    const refresh = window.setInterval(() => void load(false), 45 * 60 * 1000);
+    const refresh = window.setInterval(
+      () => void load(false),
+      mode === 'published' ? 5 * 60 * 1000 : 45 * 60 * 1000,
+    );
+    const refreshOnFocus = () => void load(false);
+    const refreshOnVisible = () => {
+      if (window.document.visibilityState === 'visible') void load(false);
+    };
+    if (mode === 'published') {
+      window.addEventListener('focus', refreshOnFocus);
+      window.document.addEventListener('visibilitychange', refreshOnVisible);
+    }
     return () => {
       cancelled = true;
       window.clearInterval(refresh);
+      window.removeEventListener('focus', refreshOnFocus);
+      window.document.removeEventListener('visibilitychange', refreshOnVisible);
     };
   }, [id, mode]);
 

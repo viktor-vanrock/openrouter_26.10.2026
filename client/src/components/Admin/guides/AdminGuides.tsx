@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Eye, FileText, Trash2, Upload } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, FileText, Loader2, Trash2, Upload } from 'lucide-react';
 import {
   Button,
   OGDialog,
@@ -226,16 +226,22 @@ export default function AdminGuides() {
   );
   const [toDelete, setToDelete] = useState<GuideMeta | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [uploadHovered, setUploadHovered] = useState(false);
   const [showArrows, setShowArrows] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const deleteInFlight = useRef(false);
   const sliderRef = useRef<HTMLDivElement>(null);
   const selectedGuide = guides.find((guide) => guide._id === selectedId) ?? null;
   const publishedGuide = guides.find((guide) => guide.isPublished) ?? null;
   const currentGuide = selectedGuide ?? publishedGuide;
-  const canPublish = Boolean(selectedGuide && !selectedGuide.isPublished);
+  const publishTarget =
+    selectedGuide ?? (publishedGuide?.hasUnpublishedChanges ? publishedGuide : null);
+  const canPublish = Boolean(
+    publishTarget && (!publishTarget.isPublished || publishTarget.hasUnpublishedChanges),
+  );
 
   useEffect(() => {
     const slider = sliderRef.current;
@@ -268,8 +274,10 @@ export default function AdminGuides() {
   };
 
   const onDelete = async () => {
-    if (!toDelete) return;
+    if (!toDelete || deleteInFlight.current) return;
+    deleteInFlight.current = true;
     setBusy(true);
+    setDeleting(true);
     try {
       await deleteGuide(toDelete._id);
       if (selectedId === toDelete._id) setSelectedId(null);
@@ -280,18 +288,23 @@ export default function AdminGuides() {
       showToast({ status: 'error', message: getErrorMessage(error) });
     } finally {
       setBusy(false);
+      setDeleting(false);
+      deleteInFlight.current = false;
     }
   };
 
   const publishSelected = async () => {
-    if (!selectedGuide) return;
+    if (!publishTarget) return;
     setBusy(true);
     try {
-      await publishGuide(selectedGuide._id);
+      await publishGuide(publishTarget._id);
       await queryClient.invalidateQueries({ queryKey: guideKeys.list });
       await queryClient.invalidateQueries({ queryKey: ['publishedGuide'] });
-      queryClient.removeQueries({ queryKey: guideKeys.one(selectedGuide._id) });
-      showToast({ status: 'success', message: 'Страница стала активной' });
+      queryClient.removeQueries({ queryKey: guideKeys.one(publishTarget._id) });
+      showToast({
+        status: 'success',
+        message: publishTarget.isPublished ? 'Изменения опубликованы' : 'Страница стала активной',
+      });
     } catch (error) {
       showToast({ status: 'error', message: getErrorMessage(error) });
     } finally {
@@ -428,15 +441,20 @@ export default function AdminGuides() {
             onClick={() => void publishSelected()}
             className="h-11 rounded-[20px] bg-[hsl(107.31deg_100%_19.13%)] px-5 text-base hover:bg-[hsl(107.31deg_100%_15%)]"
           >
-            Опубликовать
+            {publishTarget?.isPublished ? 'Опубликовать изменения' : 'Опубликовать'}
           </Button>
-          {!selectedGuide && (
+          {!publishTarget && (
             <span className="ml-3 text-sm text-text-secondary">
               Выберите страницу для публикации
             </span>
           )}
-          {selectedGuide?.isPublished && (
+          {selectedGuide?.isPublished && !selectedGuide.hasUnpublishedChanges && (
             <span className="ml-3 text-sm text-emerald-600">Эта страница уже активна</span>
+          )}
+          {publishTarget?.isPublished && publishTarget.hasUnpublishedChanges && (
+            <span className="ml-3 text-sm text-amber-700">
+              Есть сохранённые изменения. Они появятся на /guide после публикации.
+            </span>
           )}
           {selectedGuide && !selectedGuide.isPublished && (
             <Button
@@ -453,23 +471,36 @@ export default function AdminGuides() {
         <GuideMediaLibrary />
       </div>
 
-      <OGDialog open={Boolean(toDelete)} onOpenChange={(open) => !open && setToDelete(null)}>
+      <OGDialog
+        open={Boolean(toDelete)}
+        onOpenChange={(open) => !open && !deleting && setToDelete(null)}
+      >
         <OGDialogContent className="max-w-md">
           <OGDialogTitle>Удалить страницу?</OGDialogTitle>
           <p className="text-sm text-text-secondary">
             «{toDelete?.title}» будет удалена без возможности восстановления.
           </p>
           <div className="mt-5 flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setToDelete(null)}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deleting}
+              onClick={() => setToDelete(null)}
+            >
               Отмена
             </Button>
             <Button
               type="button"
               variant="destructive"
-              disabled={busy}
+              disabled={busy || deleting}
               onClick={() => void onDelete()}
+              aria-label={deleting ? 'Удаление страницы' : 'Удалить страницу'}
             >
-              Удалить
+              {deleting ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                'Удалить'
+              )}
             </Button>
           </div>
         </OGDialogContent>

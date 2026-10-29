@@ -28,10 +28,10 @@ import {
   OGDialogTitle,
   useToastContext,
 } from '@librechat/client';
-import type { GuideFull, GuideMedia } from './api';
+import type { GuideFull, GuideMedia, GuideMediaSize } from './api';
 import GuideFrame from './GuideFrame';
 import { getErrorMessage } from './utils';
-import { guideKeys, saveGuide, useGuide, useGuideMedia } from './api';
+import { guideKeys, guideMediaSnippet, saveGuide, useGuide, useGuideMedia } from './api';
 
 const GuideEditorMonaco = lazy(() => import('./GuideEditorMonaco'));
 
@@ -58,9 +58,10 @@ function MediaPickerCard({
 }: {
   item: GuideMedia;
   copied: boolean;
-  onCopy: (item: GuideMedia) => void;
+  onCopy: (item: GuideMedia, size: GuideMediaSize) => void;
 }) {
   const [failed, setFailed] = useState(false);
+  const [size, setSize] = useState<GuideMediaSize>('medium');
   useEffect(() => setFailed(false), [item.url]);
 
   return (
@@ -95,12 +96,25 @@ function MediaPickerCard({
         <p className="text-xs text-text-secondary">
           {item.kind === 'image' ? 'Картинка' : 'Видео'}
         </p>
+        <label className="flex items-center gap-2 text-xs text-text-secondary">
+          <span>Размер</span>
+          <select
+            value={size}
+            onChange={(event) => setSize(event.target.value as GuideMediaSize)}
+            className="min-w-0 rounded-md border border-border-light bg-surface-primary px-1.5 py-1 text-xs text-text-primary"
+            aria-label={`Размер файла ${item.name}`}
+          >
+            <option value="small">Малый</option>
+            <option value="medium">Средний</option>
+            <option value="large">Большой</option>
+          </select>
+        </label>
         <Button
           type="button"
           size="sm"
           variant="outline"
           className="w-full gap-2"
-          onClick={() => onCopy(item)}
+          onClick={() => onCopy(item, size)}
         >
           {copied ? <Check size={15} /> : <Copy size={15} />}
           {copied ? 'Скопировано' : 'Скопировать код'}
@@ -174,9 +188,9 @@ function GuideEditorInner({
     return () => observer.disconnect();
   }, [mediaDialogOpen, pickerMedia.length]);
 
-  const copyMedia = async (item: GuideMedia) => {
+  const copyMedia = async (item: GuideMedia, size: GuideMediaSize) => {
     try {
-      await copySnippet(item.snippet);
+      await copySnippet(guideMediaSnippet(item, size));
       setCopiedMediaId(item.id);
       window.setTimeout(() => setCopiedMediaId(null), 2000);
       showToast({ status: 'success', message: 'Код скопирован' });
@@ -210,14 +224,19 @@ function GuideEditorInner({
       }));
       await queryClient.invalidateQueries({ queryKey: guideKeys.list });
       await queryClient.invalidateQueries({ queryKey: guideKeys.one(guide._id) });
-      showToast({ status: 'success', message: 'Черновик сохранён' });
+      showToast({
+        status: 'success',
+        message: guide.isPublished
+          ? 'Изменения сохранены в черновике. Опубликуйте их в разделе «Инструкция по работе с сайтом», чтобы обновить /guide.'
+          : 'Черновик сохранён',
+      });
     } catch (error) {
       showToast({ status: 'error', message: getErrorMessage(error) });
     } finally {
       saveInFlight.current = false;
       setSaving(false);
     }
-  }, [code, guide._id, queryClient, showToast]);
+  }, [code, guide._id, guide.isPublished, queryClient, showToast]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -247,40 +266,44 @@ function GuideEditorInner({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border-light px-3">
+      <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b border-border-light px-3 py-2">
         <Button type="button" size="sm" variant="outline" onClick={goBack} className="gap-1">
           <ArrowLeft size={16} /> К списку
         </Button>
-        <span className="min-w-0 flex-1 truncate font-medium text-text-primary">{guide.title}</span>
+        <span className="min-w-32 flex-1 truncate font-medium text-text-primary">
+          {guide.title}
+        </span>
         {dirty && <span className="text-xs text-amber-600">● не сохранено</span>}
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            setMonacoMounted(true);
-            setCodeOpen((open) => !open);
-          }}
-          aria-label={codeOpen ? 'Скрыть код' : 'Открыть код'}
-          className="shrink-0 gap-1"
-        >
-          <Code size={16} />
-          <span className="max-[699px]:hidden">{codeOpen ? 'Скрыть код' : 'Открыть код'}</span>
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => setMediaDialogOpen(true)}
-          aria-label="Выбрать картинку или видео"
-          className="shrink-0 gap-1"
-        >
-          <ImagePlus size={16} />
-          <span className="max-[699px]:hidden">Выбрать картинку или видео</span>
-        </Button>
-        <Button type="button" disabled={!dirty || saving} onClick={() => void save()}>
-          {saving ? 'Сохранение…' : 'Сохранить'}
-        </Button>
+        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setMonacoMounted(true);
+              setCodeOpen((open) => !open);
+            }}
+            aria-label={codeOpen ? 'Скрыть код' : 'Открыть код'}
+            className="shrink-0 gap-1"
+          >
+            <Code size={16} />
+            <span className="max-[699px]:hidden">{codeOpen ? 'Скрыть код' : 'Открыть код'}</span>
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setMediaDialogOpen(true)}
+            aria-label="Выбрать картинку или видео"
+            className="shrink-0 gap-1"
+          >
+            <ImagePlus size={16} />
+            <span className="max-[699px]:hidden">Выбрать картинку или видео</span>
+          </Button>
+          <Button type="button" disabled={!dirty || saving} onClick={() => void save()}>
+            {saving ? 'Сохранение…' : 'Сохранить'}
+          </Button>
+        </div>
       </header>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <section
@@ -343,7 +366,7 @@ function GuideEditorInner({
                     key={item.id}
                     item={item}
                     copied={copiedMediaId === item.id}
-                    onCopy={(media) => void copyMedia(media)}
+                    onCopy={(media, size) => void copyMedia(media, size)}
                   />
                 ))
               ) : (

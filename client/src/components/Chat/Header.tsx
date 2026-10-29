@@ -143,13 +143,10 @@ function Header() {
   const showDevelopingActions = hasDevelopingCookie();
 
   return (
-    <div className="via-presentation/70 md:from-presentation/80 md:via-presentation/50 2xl:from-presentation/0 absolute top-0 z-10 flex h-[52px] w-full items-center justify-between border-b bg-presentation from-presentation to-transparent p-2 font-semibold text-text-primary 2xl:via-transparent">
-      <div className="hide-scrollbar flex w-full items-center justify-between gap-2 overflow-x-auto">
+    <div className="via-presentation/70 md:from-presentation/80 md:via-presentation/50 2xl:from-presentation/0 relative z-10 flex min-h-[52px] w-full shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b bg-presentation from-presentation to-transparent p-2 font-semibold text-text-primary 2xl:via-transparent">
+      <div className="hide-scrollbar flex max-w-full min-w-0 flex-[1_0_auto] items-center gap-2 overflow-x-auto">
         <div className="mx-1 flex items-center">
           <OpenSidebar className="md:hidden" />
-          {isSmallScreen && !showActionsInMenu && showDevelopingActions && (
-            <GuideHeaderActions compact showGuide={showDevelopingActions} />
-          )}
           {!(navVisible && isSmallScreen) && (
             <div
               className={cn(
@@ -211,19 +208,20 @@ function Header() {
             </div>
           )}
         </div>
-
-        {!isSmallScreen && (
-          <div className="flex items-center gap-2">
-            {showDevelopingActions && <GuideHeaderActions showGuide={showDevelopingActions} />}
+      </div>
+      {!showActionsInMenu && (!isSmallScreen || showDevelopingActions) && (
+        <div className="flex shrink-0 items-center gap-2">
+          {showDevelopingActions && (
+            <GuideHeaderActions compact={isSmallScreen} showGuide={showDevelopingActions} />
+          )}
+          {!isSmallScreen && (
             <ExportAndShareMenu
               isSharedButtonEnabled={startupConfig?.sharedLinksEnabled ?? false}
             />
-            {hasAccessToTemporaryChat === true && <TemporaryChat />}
-          </div>
-        )}
-      </div>
-      {/* Empty div for spacing */}
-      <div />
+          )}
+          {!isSmallScreen && hasAccessToTemporaryChat === true && <TemporaryChat />}
+        </div>
+      )}
     </div>
   );
 }

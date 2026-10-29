@@ -22,6 +22,21 @@ export type GuideMedia = {
   url: string;
   snippet: string;
 };
+
+export type GuideMediaSize = 'small' | 'medium' | 'large';
+const guideMediaWidths: Record<GuideMedia['kind'], Record<GuideMediaSize, number>> = {
+  image: { small: 320, medium: 480, large: 720 },
+  video: { small: 400, medium: 640, large: 880 },
+};
+
+export function guideMediaSnippet(media: GuideMedia, size: GuideMediaSize = 'medium'): string {
+  const width = guideMediaWidths[media.kind][size];
+  const src = `media/${media.id}`;
+  const style = 'max-width:100%;height:auto;display:block;margin:16px auto';
+  return media.kind === 'image'
+    ? `<img src="${src}" alt="" width="${width}" style="${style}">`
+    : `<video controls preload="metadata" playsinline width="${width}" style="${style}" src="${src}"></video>`;
+}
 export type GuideMediaListResponse = {
   media: GuideMedia[];
   mediaOrigin?: string;
