@@ -14,6 +14,7 @@ import RenameForm from './RenameForm';
 import { cn, logger } from '~/utils';
 import ConvoLink from './ConvoLink';
 import store from '~/store';
+import { APP_NAME } from '~/utils/brand';
 
 interface ConversationProps {
   conversation: TConversation;
@@ -157,7 +158,7 @@ export default function Conversation({
     toggleNav();
 
     if (typeof title === 'string' && title.length > 0) {
-      document.title = title;
+      document.title = APP_NAME;
     }
 
     navigateToConvo(conversation, {

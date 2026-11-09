@@ -1,20 +1,10 @@
-// useDocumentTitle.js
 import { useEffect } from 'react';
+import { APP_NAME } from '~/utils/brand';
 
-// function useDocumentTitle(title, prevailOnUnmount = false) {
-// const defaultTitle = useRef(document.title);
-function useDocumentTitle(title: string) {
+function useDocumentTitle() {
   useEffect(() => {
-    document.title = title;
-  }, [title]);
-
-  // useEffect(
-  //   () => () => {
-  //     if (!prevailOnUnmount) {
-  //       document.title = defaultTitle.current;
-  //     }
-  //   }, []
-  // );
+    document.title = APP_NAME;
+  }, []);
 }
 
 export default useDocumentTitle;

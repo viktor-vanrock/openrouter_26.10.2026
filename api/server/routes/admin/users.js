@@ -61,7 +61,7 @@ router.post('/:id/reset-password', requireManageUsers, async (req, res) => {
         email: user.email,
         subject: 'Password Reset Request',
         payload: {
-          appName: process.env.APP_TITLE || 'LibreChat',
+          appName: 'ChatRouter',
           name: user.name || user.username || user.email,
           link,
           year: new Date().getFullYear(),

@@ -14,6 +14,7 @@ import { CustomMenu as Menu } from './CustomMenu';
 import DialogManager from './DialogManager';
 import { useLocalize } from '~/hooks';
 import { useCurrentKey } from '~/Providers';
+import ModelPriceLabel from './ModelPriceLabel';
 
 const defaultInterface = getConfigDefaults().interface;
 
@@ -79,7 +80,15 @@ function ModelSelectorContent() {
               {selectedIcon}
             </div>
           )} */}
-          <span className="flex-grow truncate text-left">{selectedDisplayValue}</span>
+          <span className="min-w-0 flex-1 truncate text-left">{selectedDisplayValue}</span>
+          <ModelPriceLabel
+            modelId={
+              selectedValues.modelSpec
+                ? modelSpecs.find((spec) => spec.name === selectedValues.modelSpec)?.preset.model
+                : selectedValues.model
+            }
+            endpoint={selectedValues.endpoint}
+          />
         </button>
       }
     />
@@ -101,7 +110,7 @@ function ModelSelectorContent() {
         comboboxLabel={localize('com_endpoint_search_models')}
         trigger={trigger}
       >
-        <div style={{ minWidth: '400px', maxHeight: '420px' }}>
+        <div className="w-full min-w-0 sm:min-w-[400px]" style={{ maxHeight: '420px' }}>
           {searchResults ? (
             renderSearchResults(searchResults, localize, searchValue)
           ) : (

@@ -28,6 +28,13 @@ const NODE_POLYFILL_SHIMS: Record<string, string> = {
     require.resolve('vite-plugin-node-polyfills/shims/global'),
 };
 
+const nodePolyfillShimsResolver = (): Plugin => ({
+  name: 'node-polyfills-shims-resolver',
+  resolveId(id) {
+    return NODE_POLYFILL_SHIMS[id] ?? null;
+  },
+});
+
 // https://vitejs.dev/config/
 const buildMinifier = process.env.BUILD_MINIFIER || 'terser';
 if (buildMinifier !== 'terser' && buildMinifier !== 'esbuild') {
@@ -74,14 +81,12 @@ export default defineConfig(({ command }) => ({
   // Set the directory where environment variables are loaded from and restrict prefixes
   envDir: '../',
   envPrefix: ['VITE_', 'SCRIPT_', 'DOMAIN_', 'ALLOW_'],
+  worker: {
+    plugins: () => [nodePolyfillShimsResolver()],
+  },
   plugins: [
     react(),
-    {
-      name: 'node-polyfills-shims-resolver',
-      resolveId(id) {
-        return NODE_POLYFILL_SHIMS[id] ?? null;
-      },
-    },
+    nodePolyfillShimsResolver(),
     nodePolyfills(),
     VitePWA({
       injectRegister: 'auto', // 'auto' | 'manual' | 'disabled'
@@ -100,14 +105,21 @@ export default defineConfig(({ command }) => ({
           'assets/maskable-icon.png',
           'manifest.webmanifest',
         ],
-        globIgnores: ['images/**/*', '**/*.map', 'index.html', 'assets/rum.*.js'],
+        globIgnores: [
+          'images/**/*',
+          '**/*.map',
+          'index.html',
+          'assets/rum.*.js',
+          'assets/*worker-*.js',
+          'assets/code-editor.*.js',
+        ],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         navigateFallbackDenylist: [/^\/oauth/, /^\/api/],
       },
       includeAssets: [],
       manifest: {
-        name: 'OpenRouter Chat',
-        short_name: 'OpenRouter Chat',
+        name: 'ChatRouter',
+        short_name: 'ChatRouter',
         display: 'standalone',
         background_color: '#000000',
         theme_color: '#009688',

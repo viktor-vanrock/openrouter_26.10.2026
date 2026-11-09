@@ -39,14 +39,7 @@ function SharedView() {
   const [langcode, setLangcode] = useRecoilState(store.lang);
 
   // configure document title
-  let docTitle = '';
-  if (config?.appTitle != null && data?.title != null) {
-    docTitle = `${data.title} | ${config.appTitle}`;
-  } else {
-    docTitle = data?.title ?? config?.appTitle ?? document.title;
-  }
-
-  useDocumentTitle(docTitle);
+  useDocumentTitle();
 
   const locale =
     langcode ||

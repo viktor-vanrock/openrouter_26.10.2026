@@ -1,5 +1,10 @@
 const mongoose = require('mongoose');
-const { logger, ensurePrototypeIndexes } = require('@librechat/data-schemas');
+const {
+  logger,
+  ensurePrototypeIndexes,
+  ensureGuidePageIndexes,
+  ensureReleaseIndexes,
+} = require('@librechat/data-schemas');
 const {
   logAgentMigrationWarning,
   logPromptMigrationWarning,
@@ -14,6 +19,25 @@ const { findRoleByIdentifier } = require('~/models');
  */
 async function checkMigrations() {
   await ensurePrototypeIndexes(mongoose.connection);
+  await ensureGuidePageIndexes(mongoose.connection);
+  await ensureReleaseIndexes(mongoose.connection);
+  // Keep startup compatible with a workspace whose data-schemas package has not yet
+  // been rebuilt: server code resolves that package from its generated dist files.
+  const guideMediaCollection = mongoose.connection.db.collection('guidemedias');
+  const guideMediaExists = await mongoose.connection.db
+    .listCollections({ name: 'guidemedias' })
+    .hasNext();
+  const guideMediaIndexes = guideMediaExists
+    ? await guideMediaCollection.listIndexes().toArray()
+    : [];
+  if (
+    !guideMediaIndexes.some(
+      (index) => Object.keys(index.key).length === 1 && index.key.createdAt === -1,
+    )
+  ) {
+    await guideMediaCollection.createIndex({ createdAt: -1 });
+  }
+  await guideMediaCollection.createIndex({ key: 1 }, { name: 'key_1', unique: true });
   try {
     const agentMigrationResult = await checkAgentPermissionsMigration({
       mongoose,

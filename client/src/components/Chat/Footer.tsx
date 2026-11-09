@@ -5,6 +5,7 @@ import { Constants } from 'librechat-data-provider';
 import type { TStartupConfig } from 'librechat-data-provider';
 import { useGetStartupConfig } from '~/data-provider';
 import { useLocalize } from '~/hooks';
+import { APP_NAME, withChatRouterBrand } from '~/utils/brand';
 
 type FooterProps = {
   className?: string;
@@ -32,10 +33,10 @@ function Footer({ className, startupConfig }: FooterProps) {
     </a>
   );
 
-  const mainContentParts = (
+  const mainContentParts = withChatRouterBrand(
     typeof config?.customFooter === 'string'
       ? config.customFooter
-      : 'OpenRouter Chat ' + Constants.VERSION + ' - ' + localize('com_ui_latest_footer')
+      : APP_NAME + ' ' + Constants.VERSION + ' - ' + localize('com_ui_latest_footer'),
   ).split('|');
 
   useEffect(() => {

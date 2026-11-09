@@ -168,7 +168,7 @@ function EndpointMenuContent({
     : null;
 
   return (
-    <div className="h-[430px]">
+    <div className="flex h-[min(400px,calc(var(--popover-available-height,448px)-48px))] w-full min-w-0 flex-col overflow-hidden">
       {endpointSpecs.map((spec: TModelSpec) => (
         <ModelSpecItem key={spec.name} spec={spec} isSelected={selectedSpec === spec.name} />
       ))}
@@ -225,6 +225,7 @@ export function EndpointItem({ endpoint, endpointIndex }: EndpointItemProps) {
         : localize('com_endpoint_search_endpoint_models', { 0: endpoint.label });
     return (
       <Menu
+        wide={endpoint.value === 'OpenRouter'}
         id={`endpoint-${endpoint.value}-menu`}
         key={`endpoint-${endpoint.value}-item`}
         searchValue={searchValue}

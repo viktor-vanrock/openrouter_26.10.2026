@@ -12,6 +12,7 @@ export interface CustomMenuProps extends Ariakit.MenuButtonProps<'div'> {
   comboboxLabel?: string;
   trigger?: Ariakit.MenuButtonProps['render'];
   defaultOpen?: boolean;
+  wide?: boolean;
 }
 
 export const CustomMenu = React.forwardRef<HTMLDivElement, CustomMenuProps>(function CustomMenu(
@@ -26,6 +27,7 @@ export const CustomMenu = React.forwardRef<HTMLDivElement, CustomMenuProps>(func
     comboboxLabel,
     trigger,
     defaultOpen,
+    wide = false,
     ...props
   },
   ref,
@@ -65,11 +67,14 @@ export const CustomMenu = React.forwardRef<HTMLDivElement, CustomMenuProps>(func
         gutter={parent ? -4 : 4}
         className={cn(
           parent ? 'animate-popover-left ml-3' : 'animate-popover',
-          'outline-none! z-40 flex max-h-[min(450px,var(--popover-available-height))] w-full',
-          'w-[var(--menu-width,auto)] min-w-[300px] flex-col rounded-xl border border-border-light',
+          'outline-none! z-40 flex max-h-[min(450px,var(--popover-available-height))] overflow-hidden',
+          'flex-col rounded-xl border border-border-light',
           'bg-presentation text-sm text-text-primary shadow-lg',
           parent ? 'px-0.5 py-0.5' : 'px-3 py-2',
-          'max-w-[calc(100vw-4rem)] sm:max-h-[calc(65vh)] sm:max-w-[400px]',
+          wide
+            ? 'w-[560px] max-w-[calc(100vw-2rem)]'
+            : 'w-[var(--menu-width,auto)] w-full min-w-0 max-w-[calc(100vw-2rem)] sm:min-w-[300px] sm:max-w-[400px]',
+          'sm:max-h-[calc(65vh)]',
           searchable && 'p-0',
         )}
       >
@@ -94,7 +99,9 @@ export const CustomMenu = React.forwardRef<HTMLDivElement, CustomMenuProps>(func
                   )}
                 </div>
               </div>
-              <Ariakit.ComboboxList className="p-0.5 pt-0">{children}</Ariakit.ComboboxList>
+              <Ariakit.ComboboxList className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-0.5 pt-0">
+                {children}
+              </Ariakit.ComboboxList>
             </>
           ) : (
             children

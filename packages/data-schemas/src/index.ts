@@ -30,7 +30,14 @@ export {
   SYSTEM_TENANT_ID,
 } from './config/tenantContext';
 export type { TenantContext } from './config/tenantContext';
-export { dropSupersededTenantIndexes, dropSupersededPromptGroupIndexes, ensurePrototypeIndexes } from './migrations';
+export {
+  dropSupersededTenantIndexes,
+  dropSupersededPromptGroupIndexes,
+  ensurePrototypeIndexes,
+  ensureGuidePageIndexes,
+  ensureGuideMediaIndexes,
+  ensureReleaseIndexes,
+} from './migrations';
 
 export { createPrototypeStoreModels } from './models/prototypeStore';
 export { createPrototypeMethods } from './methods/prototype';

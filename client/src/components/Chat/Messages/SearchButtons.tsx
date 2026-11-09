@@ -8,6 +8,7 @@ import type { ConversationCursorData } from '~/utils';
 import { useLocalize, useNavigateToConvo } from '~/hooks';
 import { findConversationInInfinite } from '~/utils';
 import store from '~/store';
+import { APP_NAME } from '~/utils/brand';
 
 export default function SearchButtons({ message }: { message: TMessage }) {
   const localize = useLocalize();
@@ -38,7 +39,7 @@ export default function SearchButtons({ message }: { message: TMessage }) {
       title = cachedConvo?.title ?? '';
     }
 
-    document.title = title;
+    document.title = APP_NAME;
     navigateToConvo(
       cachedConvo ??
         ({

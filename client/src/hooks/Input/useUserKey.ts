@@ -1,9 +1,11 @@
 import { useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { EModelEndpoint } from 'librechat-data-provider';
 import { useUserKeyQuery, useUpdateUserKeysMutation } from 'librechat-data-provider/react-query';
 import { useGetEndpointsQuery } from '~/data-provider';
 
 const useUserKey = (endpoint: string) => {
+  const queryClient = useQueryClient();
   const { data: endpointsConfig } = useGetEndpointsQuery();
   const config = endpointsConfig?.[endpoint ?? ''];
 
@@ -54,12 +56,16 @@ const useUserKey = (endpoint: string) => {
           expiresAt: dateStr,
         },
         {
-          onSuccess: options?.onSuccess,
+          onSuccess: () => {
+            if (keyName === 'OpenRouter')
+              void queryClient.invalidateQueries(['openrouter', 'model-prices']);
+            options?.onSuccess?.();
+          },
           onError: options?.onError,
         },
       );
     },
-    [updateKey, keyName],
+    [updateKey, keyName, queryClient],
   );
 
   return useMemo(

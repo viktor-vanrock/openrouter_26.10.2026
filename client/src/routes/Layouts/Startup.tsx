@@ -5,6 +5,7 @@ import { TranslationKeys, useLocalize } from '~/hooks';
 import { useGetStartupConfig } from '~/data-provider';
 import AuthLayout from '~/components/Auth/AuthLayout';
 import { REDIRECT_PARAM, SESSION_KEY } from '~/utils';
+import { APP_NAME } from '~/utils/brand';
 import { Spinner } from '@librechat/client';
 
 const headerMap: Record<string, TranslationKeys> = {
@@ -47,7 +48,7 @@ export default function StartupLayout({ isAuthenticated }: { isAuthenticated?: b
   }, [isAuthenticated, navigate, data]);
 
   useEffect(() => {
-    document.title = startupConfig?.appTitle || 'OpenRouter Chat';
+    document.title = APP_NAME;
   }, [startupConfig?.appTitle]);
 
   useEffect(() => {

@@ -2982,3 +2982,71 @@ html {
 .sharepoint-picker-bg {
   background-color: #f5f5f5;
 }
+
+.guide-button-unvisited {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.attention-button-shadow {
+  box-shadow:
+    0 5px 14px rgba(127, 29, 29, 0.28),
+    0 0 18px rgba(220, 38, 38, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  transition:
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.attention-button-shadow:hover {
+  box-shadow:
+    0 7px 18px rgba(127, 29, 29, 0.34),
+    0 0 24px rgba(220, 38, 38, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px);
+}
+
+.releases-dialog > button:focus {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.releases-dialog > button:focus-visible {
+  background-color: var(--surface-hover);
+}
+
+.guide-button-unvisited::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 25%,
+    rgba(255, 255, 255, 0.08) 40%,
+    rgba(255, 255, 255, 0.45) 50%,
+    rgba(255, 255, 255, 0.08) 60%,
+    transparent 75%
+  );
+  transform: translateX(-120%);
+  animation: guide-button-shine 3.5s ease-in-out infinite;
+}
+
+@keyframes guide-button-shine {
+  0%,
+  30% {
+    transform: translateX(-120%);
+  }
+  70%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-button-unvisited::after {
+    animation: none;
+  }
+}

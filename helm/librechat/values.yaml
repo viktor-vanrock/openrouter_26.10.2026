@@ -198,6 +198,11 @@ ingress:
   #    hosts:
   #      - chat.example.com
 
+# Dedicated path so the larger upload limit does not apply to the rest of the API.
+guidesMediaIngress:
+  enabled: false
+  hosts: []
+
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little

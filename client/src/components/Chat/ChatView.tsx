@@ -94,7 +94,7 @@ function ChatView({ index = 0 }: { index?: number }) {
                     'flex flex-col',
                     isLandingPage
                       ? 'flex-1 items-center justify-end sm:justify-center'
-                      : 'h-full overflow-y-auto',
+                      : 'min-h-0 flex-1 overflow-y-auto',
                   )}
                 >
                   {content}
