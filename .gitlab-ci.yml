@@ -32,6 +32,8 @@ build:
     - get_version
   variables:
     DOCKERFILE: Dockerfile.multi
+    KUBERNETES_MEMORY_REQUEST: "4Gi"
+    KUBERNETES_MEMORY_LIMIT: "6Gi"
 
 # 🔍 Диагностика кластера
 debug_k8s:
