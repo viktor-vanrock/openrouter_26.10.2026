@@ -1,5 +1,9 @@
 const { logger } = require('@librechat/data-schemas');
 const { createContentAggregator } = require('@librechat/agents');
+const { ChatOpenAICompletions } = require('@langchain/openai');
+const { enableOpenRouterImageStream } = require('./openrouterImageStream');
+const { isDirectImageRequest } = require('./openrouterImageConfig');
+enableOpenRouterImageStream(ChatOpenAICompletions);
 const {
   loadSkillStates,
   initializeAgent,
@@ -137,7 +141,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
    *      `agent.skills` allowlist narrows the catalog; empty/undefined
    *      allowlist with the toggle on = full accessible catalog. */
   const enabledCapabilities = new Set(appConfig?.endpoints?.[EModelEndpoint.agents]?.capabilities);
-  const skillsCapabilityEnabled = enabledCapabilities.has(AgentCapabilities.skills);
+  const skillsCapabilityEnabled = !isDirectImageRequest(req) && enabledCapabilities.has(AgentCapabilities.skills);
   const codeEnvAvailable = enabledCapabilities.has(AgentCapabilities.execute_code);
   const ephemeralSkillsToggle = req.body?.ephemeralAgent?.skills === true;
 
@@ -229,6 +233,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     summarizationOptions,
     aggregateContent,
     toolEndCallback,
+    nativeImageCallback: req.cookies?.developing === '1' && req.body?.endpoint === 'OpenRouter' ? toolEndCallback : null,
     collectedUsage,
     collectedThoughtSignatures,
     streamId,
@@ -243,6 +248,11 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
   delete endpointOption.agent;
   if (!primaryAgent) {
     throw new Error('Agent not found');
+  }
+  if (isDirectImageRequest(req)) {
+    primaryAgent.tools = [];
+    primaryAgent.instructions = undefined;
+    primaryAgent.additional_instructions = undefined;
   }
 
   const modelsConfig = await getModelsConfig(req);
@@ -320,6 +330,13 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
       getSkillByName: db.getSkillByName,
     },
   );
+  if (isDirectImageRequest(req)) {
+    primaryConfig.model_parameters.modalities = ['image', 'text'];
+    primaryConfig.instructions = undefined;
+    primaryConfig.additional_instructions = undefined;
+    primaryConfig.manualSkillPrimes = [];
+    primaryConfig.alwaysApplySkillPrimes = [];
+  }
 
   logger.debug(
     `[initializeClient] Storing tool context for ${primaryConfig.id}: ${primaryConfig.toolDefinitions?.length ?? 0} tools, registry size: ${primaryConfig.toolRegistry?.size ?? '0'}`,
@@ -783,6 +800,12 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
   }
 
   primaryConfig.subagents = subagentsCapabilityEnabled ? primaryConfig.subagents : undefined;
+  if (isDirectImageRequest(req)) {
+    agentConfigs.clear();
+    primaryConfig.subagents = undefined;
+    primaryConfig.subagentAgentConfigs = undefined;
+    primaryConfig.edges = [];
+  }
 
   /** If the capability is off at the endpoint level, strip `subagents` on
    *  every loaded config — not just the primary. `run.ts` calls

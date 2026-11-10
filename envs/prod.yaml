@@ -25,6 +25,8 @@ librechat:
     PROTOTYPE_MODEL_PROXY_ENABLED: "true"
     PROTOTYPE_SERVICE_AUTH_MODE: "bearer"
     PROTOTYPE_LOCAL_TURN_LIMIT_USD: "2"
+    # Модель используемая для генерации изображений в чате
+    OPENROUTER_IMAGE_MODEL: "google/gemini-2.5-flash-image"
 
   existingSecretName: ""
   

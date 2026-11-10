@@ -9,7 +9,7 @@ import type {
 import { ParallelContentRenderer, type PartWithIndex } from './ParallelContent';
 import { mapAttachments, groupSequentialToolCalls } from '~/utils';
 import { MessageContext, SearchContext } from '~/Providers';
-import { EditTextPart, EmptyText } from './Parts';
+import { AttachmentGroup, EditTextPart, EmptyText } from './Parts';
 import PendingSkillCall from './Parts/PendingSkillCall';
 import MemoryArtifacts from './MemoryArtifacts';
 import ToolCallGroup from './ToolCallGroup';
@@ -126,6 +126,10 @@ const ContentParts = memo(function ContentParts({
   isLatestMessage,
 }: ContentPartsProps) {
   const attachmentMap = useMemo(() => mapAttachments(attachments ?? []), [attachments]);
+  const nativeImages = useMemo(
+    () => (attachments ?? []).filter((attachment) => !attachment.toolCallId && attachment.type?.startsWith('image/')),
+    [attachments],
+  );
   const effectiveIsSubmitting = isLatestMessage ? isSubmitting : false;
 
   /**
@@ -331,6 +335,7 @@ const ContentParts = memo(function ContentParts({
     return (
       <>
         {renderPendingSkills()}
+        {nativeImages.length > 0 && <AttachmentGroup attachments={nativeImages} />}
         <ParallelContentRenderer
           content={content}
           messageId={messageId}
@@ -348,6 +353,7 @@ const ContentParts = memo(function ContentParts({
   return (
     <SearchContext.Provider value={{ searchResults }}>
       <MemoryArtifacts attachments={attachments} />
+      {nativeImages.length > 0 && <AttachmentGroup attachments={nativeImages} />}
       {renderPendingSkills()}
       {showEmptyCursor && (
         <Container>

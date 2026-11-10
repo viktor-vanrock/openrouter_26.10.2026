@@ -30,6 +30,10 @@ import {
 import PendingManualSkillsChips from './PendingManualSkillsChips';
 import { cn, getModelSpec, removeFocusRings } from '~/utils';
 import { useGetStartupConfig } from '~/data-provider';
+import { useGetModelCapabilitiesQuery } from 'librechat-data-provider/react-query';
+import { hasDevelopingCookie } from '~/utils/developingCookie';
+import { imageModeAvailability } from './imageModeAvailability';
+import ImageGenerateButton from './ImageGenerateButton';
 import { mainTextareaId, BadgeItem } from '~/common';
 import AttachFileChat from './Files/AttachFileChat';
 import FileFormChat from './Files/FileFormChat';
@@ -104,6 +108,19 @@ const ChatForm = memo(function ChatForm({
   } = useAddedChatContext();
   const assistantMap = useAssistantsMapContext();
   const { data: startupConfig } = useGetStartupConfig();
+  const developing = hasDevelopingCookie();
+  const { data: modelCapabilities } = useGetModelCapabilitiesQuery({
+    refetchOnMount: 'always',
+    enabled: developing && (conversation?.endpoint as string | null | undefined) === 'OpenRouter',
+  });
+  const imageModeStatus = imageModeAvailability({
+    developing,
+    endpoint: conversation?.endpoint,
+    model: conversation?.model,
+    metadata: (modelCapabilities?.[conversation?.endpoint ?? ''] ?? []).find(
+      (item) => item.id === conversation?.model,
+    ),
+  });
 
   const endpoint = useMemo(
     () => conversation?.endpointType ?? conversation?.endpoint,
@@ -187,7 +204,7 @@ const ChatForm = memo(function ChatForm({
     isSubmitting,
   });
 
-  const { submitMessage, submitPrompt } = useSubmitMessage();
+  const { submitMessage, submitImage, submitPrompt } = useSubmitMessage();
 
   const handleKeyUp = useHandleKeyUp({
     index,
@@ -260,7 +277,7 @@ const ChatForm = memo(function ChatForm({
 
   return (
     <form
-      onSubmit={methods.handleSubmit(submitMessage)}
+      onSubmit={methods.handleSubmit((data) => submitMessage(data))}
       className={cn(
         'mx-auto flex w-full flex-row gap-3 transition-[max-width] duration-300 sm:px-2',
         maximizeChatSpace ? 'max-w-full' : 'md:max-w-3xl xl:max-w-4xl',
@@ -404,6 +421,14 @@ const ChatForm = memo(function ChatForm({
                 }
               />
               <div className="mx-auto flex" />
+              <ImageGenerateButton
+                eligible={imageModeStatus.eligible}
+                text={textValue}
+                disabled={disableInputs || isSubmitting || prototypeMode || isNotAppendable}
+                model={startupConfig?.openrouterImage?.model ?? 'google/gemini-2.5-flash-image'}
+                description={startupConfig?.openrouterImage?.description ?? 'Google Gemini 2.5 Flash Image: создаёт изображения по тексту'}
+                onGenerate={() => { void methods.handleSubmit(submitImage)(); }}
+              />
               {SpeechToText && (
                 <AudioRecorder
                   methods={methods}

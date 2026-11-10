@@ -679,7 +679,17 @@ class BaseClient {
     }
 
     if (this.artifactPromises) {
-      responseMessage.attachments = (await Promise.all(this.artifactPromises)).filter((a) => a);
+      const artifacts = (await Promise.all(this.artifactPromises)).filter((a) => a);
+      const imageSaveFailed = artifacts.some((a) => a.openrouterImageSaveFailed === true);
+      responseMessage.attachments = artifacts.filter((a) => a.openrouterImageSaveFailed !== true);
+      if (imageSaveFailed && this.options.req?.cookies?.developing === '1') {
+        const message = 'Изображение создано, но не удалось его сохранить';
+        if (Array.isArray(responseMessage.content)) {
+          responseMessage.content.push({ type: ContentTypes.ERROR, [ContentTypes.ERROR]: message });
+        } else {
+          responseMessage.text = [responseMessage.text, message].filter(Boolean).join('\n\n');
+        }
+      }
     }
 
     if (this.options.attachments) {

@@ -13,6 +13,7 @@ const createOpenAIImageTools = require('./structured/OpenAIImageTools');
 const TavilySearchResults = require('./structured/TavilySearchResults');
 const createGeminiImageTool = require('./structured/GeminiImageGen');
 const CreatePrototype = require('./structured/CreatePrototype');
+const OpenRouterImageGen = require('./structured/OpenRouterImageGen');
 
 module.exports = {
   ...manifest,
@@ -28,5 +29,6 @@ module.exports = {
   TavilySearchResults,
   createOpenAIImageTools,
   createGeminiImageTool,
+  OpenRouterImageGen,
   CreatePrototype,
 };

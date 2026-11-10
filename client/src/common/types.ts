@@ -339,6 +339,7 @@ export type TAskProps = {
 };
 
 export type TOptions = {
+  directImage?: boolean;
   editedMessageId?: string | null;
   editedContent?: t.TEditedContent;
   editedText?: string | null;

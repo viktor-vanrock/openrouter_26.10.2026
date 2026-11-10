@@ -102,6 +102,7 @@ export type TEphemeralAgent = {
   web_search?: boolean;
   file_search?: boolean;
   execute_code?: boolean;
+  image_generation?: boolean;
   artifacts?: string;
   skills?: boolean;
 };
@@ -114,6 +115,7 @@ export type TPayload = Partial<TMessage> &
     messages?: TMessages;
     isTemporary: boolean;
     ephemeralAgent?: TEphemeralAgent | null;
+    image_generation_direct?: boolean;
     editedContent?: TEditedContent | null;
     /** Added conversation for multi-convo feature */
     addedConvo?: TConversation;
@@ -150,6 +152,7 @@ export type TSubmission = {
   endpointOption: TEndpointOption;
   clientTimestamp?: string;
   ephemeralAgent?: TEphemeralAgent | null;
+  image_generation_direct?: boolean;
   editedContent?: TEditedContent | null;
   /** Added conversation for multi-convo feature */
   addedConvo?: TConversation;

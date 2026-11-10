@@ -19,6 +19,7 @@ import { mainTextareaId } from '~/common';
 import store from '~/store';
 import usePrototypeAvailability from '~/hooks/Prototype/usePrototypeAvailability';
 import useSetFilesToDelete from '~/hooks/Files/useSetFilesToDelete';
+import { hasDevelopingCookie } from '~/utils/developingCookie';
 
 export default function useSubmitMessage() {
   const { user } = useAuthContext();
@@ -27,8 +28,9 @@ export default function useSubmitMessage() {
   filesToDeleteRef.current = setFilesToDelete;
   const methods = useChatFormContext();
   const { conversation: addedConvo } = useAddedChatContext();
-  const { ask, index, getMessages, setMessages, conversation, setConversation, files, setFiles } =
+  const { ask, index, getMessages, setMessages, conversation, setConversation, files, setFiles, isSubmitting } =
     useChatContext();
+  const imageSubmitInFlight = useRef(false);
   const { showToast } = useToastContext();
   const latestMessage = useLatestMessage(index);
   const queryClient = useQueryClient();
@@ -64,7 +66,7 @@ export default function useSubmitMessage() {
   const setActivePrompt = useSetRecoilState(store.activePromptByIndex(index));
 
   const submitMessage = useCallback(
-    async (data?: { text: string }) => {
+    async (data?: { text: string }, options?: { directImage?: boolean }) => {
       if (!data) {
         return console.warn('No data provided to submitMessage');
       }
@@ -263,7 +265,7 @@ export default function useSubmitMessage() {
           text: data.text,
         },
         {
-          addedConvo: addedConvo ?? undefined,
+          ...(options?.directImage ? { directImage: true } : { addedConvo: addedConvo ?? undefined }),
         },
       );
       methods.reset();
@@ -293,6 +295,20 @@ export default function useSubmitMessage() {
     ],
   );
 
+  const submitImage = useCallback(
+    async (data: { text: string }) => {
+      if (!hasDevelopingCookie() || (conversation?.endpoint as string | null | undefined) !== 'OpenRouter' ||
+        !data.text.trim() || prototypeMode || isSubmitting || imageSubmitInFlight.current) return;
+      imageSubmitInFlight.current = true;
+      try {
+        await submitMessage(data, { directImage: true });
+      } finally {
+        imageSubmitInFlight.current = false;
+      }
+    },
+    [submitMessage, conversation?.endpoint, prototypeMode, isSubmitting],
+  );
+
   const submitPrompt = useCallback(
     (text: string) => {
       const parsedText = replaceSpecialVars({ text, user });
@@ -309,5 +325,5 @@ export default function useSubmitMessage() {
     [autoSendPrompts, submitMessage, setActivePrompt, methods, user],
   );
 
-  return { submitMessage, submitPrompt };
+  return { submitMessage, submitImage, submitPrompt };
 }

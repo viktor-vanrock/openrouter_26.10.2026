@@ -356,10 +356,19 @@ export async function fetchModelInfo(params: FetchModelsParams): Promise<ModelIn
       if (typeof model?.id !== 'string') {
         return result;
       }
+      const architecture = model.architecture;
+      const inputModalities = architecture?.input_modalities ?? model.input_modalities;
+      const outputModalities = architecture?.output_modalities ?? model.output_modalities;
       result.push({
         id: model.id,
         supported_parameters: Array.isArray(model.supported_parameters)
           ? model.supported_parameters.filter((parameter) => typeof parameter === 'string')
+          : undefined,
+        input_modalities: Array.isArray(inputModalities)
+          ? inputModalities.filter((modality) => typeof modality === 'string')
+          : undefined,
+        output_modalities: Array.isArray(outputModalities)
+          ? outputModalities.filter((modality) => typeof modality === 'string')
           : undefined,
       });
       return result;

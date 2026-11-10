@@ -24,6 +24,13 @@ export const DEFAULT_WEB_SEARCH_MODEL = 'perplexity/sonar';
 export interface ModelInfo {
   id: string;
   supported_parameters?: string[];
+  architecture?: {
+    input_modalities?: string[];
+    output_modalities?: string[];
+  };
+  /** Modalities accepted and returned by OpenRouter model endpoints. */
+  input_modalities?: string[];
+  output_modalities?: string[];
 }
 
 export function filterToolsCapableModels(models: ModelInfo[]): ModelInfo[] {
@@ -35,6 +42,11 @@ export function isToolsCapableModel(model: ModelInfo): boolean {
     model.supported_parameters?.includes('tools') ||
       model.supported_parameters?.includes('function_calling'),
   );
+}
+
+/** True only when model metadata explicitly declares image output support. */
+export function isImageOutputCapableModel(model: ModelInfo): boolean {
+  return (model.output_modalities ?? model.architecture?.output_modalities)?.includes('image') === true;
 }
 
 const webSearchCapableModelIds = new Set<string>(WEB_SEARCH_CAPABLE_MODELS);

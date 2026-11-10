@@ -49,6 +49,47 @@ jest.mock('~/config', () => ({
 }));
 
 describe('AgentClient - titleConvo', () => {
+  describe('direct image request isolation', () => {
+    it('preserves selected conversation parameters without mutating the artist request', () => {
+      const artistParameters = { model: 'artist/model' };
+      const originalParameters = { model: 'selected/model', temperature: 0.3, promptPrefix: 'Instructions' };
+      const client = Object.create(AgentClient.prototype);
+      client.options = {
+        endpoint: 'OpenRouter',
+        agent: { id: 'artist-id' },
+        req: {
+          cookies: { developing: '1' },
+          body: { endpoint: 'OpenRouter', image_generation_direct: true,
+            endpointOption: { model_parameters: artistParameters } },
+          imageGenerationConversationParameters: originalParameters,
+          imageGenerationConversationSpec: 'my-spec',
+          resolvedConversation: { agent_id: 'original-id' },
+        },
+      };
+      const saved = client.getSaveOptions();
+      expect(saved).toMatchObject({ ...originalParameters, spec: 'my-spec', agent_id: 'original-id' });
+      expect(artistParameters).toEqual({ model: 'artist/model' });
+    });
+
+    it('builds a prompt from only the latest text, excluding history and attachments', async () => {
+      const client = Object.create(AgentClient.prototype);
+      client.options = { req: { cookies: { developing: '1' }, body: {
+        endpoint: 'OpenRouter', image_generation_direct: true,
+      } }, agent: { id: 'artist' } };
+      const ordered = jest.spyOn(AgentClient, 'getMessagesForConversation').mockReturnValue([
+        { messageId: 'old', text: 'Old context', isCreatedByUser: true },
+        { messageId: 'current', text: 'A cat', isCreatedByUser: true, fileContext: 'Attachment contents' },
+      ]);
+      try {
+        const result = await client.buildMessages([], 'current');
+        expect(result.prompt).toEqual([{ role: 'user', content: 'A cat' }]);
+        expect(Object.keys(result.tokenCountMap)).toEqual(['current']);
+      } finally {
+        ordered.mockRestore();
+      }
+    });
+  });
+
   let client;
   let mockRun;
   let mockReq;

@@ -445,6 +445,26 @@ export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
     toolType: 'builtin',
     responseFormat: geminiToolkit.gemini_image_gen.responseFormat,
   },
+  openrouter_image_gen: {
+    name: 'openrouter_image_gen',
+    description:
+      'Generate an image for the user through OpenRouter. Call this whenever the user asks to create, draw, make, or send an image. Do not answer image-generation requests with ASCII art, SVG, code, or prompts for another service.',
+    schema: {
+      type: 'object',
+      properties: {
+        prompt: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 10000,
+          description: 'A concise visual description for the image to generate.',
+        },
+      },
+      required: ['prompt'],
+      additionalProperties: false,
+    },
+    toolType: 'builtin',
+    responseFormat: 'content_and_artifact',
+  },
 };
 
 /**

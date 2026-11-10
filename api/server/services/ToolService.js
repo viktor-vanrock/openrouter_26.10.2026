@@ -507,6 +507,7 @@ const nativeTools = new Set([
   Tools.execute_code,
   Tools.file_search,
   Tools.web_search,
+  'openrouter_image_gen',
   'create_prototype',
 ]);
 

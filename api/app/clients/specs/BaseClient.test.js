@@ -527,6 +527,36 @@ describe('BaseClient', () => {
   });
 
   describe('sendMessage', () => {
+    test('persists an OpenRouter image save error instead of an attachment', async () => {
+      TestClient.options = { ...TestClient.options, req: { cookies: { developing: '1' } } };
+      TestClient.artifactPromises = [Promise.resolve({ openrouterImageSaveFailed: true })];
+      const response = await TestClient.sendMessage(userMessage);
+      expect(response.text).toContain('Изображение создано, но не удалось его сохранить');
+      expect(response.attachments).toEqual([]);
+      expect(saveMessage).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        text: expect.stringContaining('Изображение создано, но не удалось его сохранить'),
+      }), expect.anything());
+    });
+
+    test('persists an image save error as a content part', async () => {
+      TestClient.options = { ...TestClient.options, endpoint: 'agents', req: { cookies: { developing: '1' } } };
+      TestClient.clientName = 'agents';
+      TestClient.artifactPromises = [Promise.resolve({ openrouterImageSaveFailed: true })];
+      TestClient.sendCompletion.mockResolvedValue({ completion: [], metadata: undefined });
+      const response = await TestClient.sendMessage(userMessage);
+      expect(response.content).toContainEqual({ type: 'error', error: 'Изображение создано, но не удалось его сохранить' });
+      expect(saveMessage).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        content: expect.arrayContaining([{ type: 'error', error: 'Изображение создано, но не удалось его сохранить' }]),
+      }), expect.anything());
+    });
+
+    test('does not emit the image save message without the cookie', async () => {
+      TestClient.options = { ...TestClient.options, req: { cookies: {} } };
+      TestClient.artifactPromises = [Promise.resolve({ openrouterImageSaveFailed: true })];
+      const response = await TestClient.sendMessage(userMessage);
+      expect(response.text).not.toContain('Изображение создано, но не удалось его сохранить');
+    });
+
     test('sendMessage should return a response message', async () => {
       const expectedResult = expect.objectContaining({
         sender: TestClient.sender,
