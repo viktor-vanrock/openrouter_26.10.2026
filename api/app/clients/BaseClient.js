@@ -682,7 +682,7 @@ class BaseClient {
       const artifacts = (await Promise.all(this.artifactPromises)).filter((a) => a);
       const imageSaveFailed = artifacts.some((a) => a.openrouterImageSaveFailed === true);
       responseMessage.attachments = artifacts.filter((a) => a.openrouterImageSaveFailed !== true);
-      if (imageSaveFailed && this.options.req?.cookies?.developing === '1') {
+      if (imageSaveFailed) {
         const message = 'Изображение создано, но не удалось его сохранить';
         if (Array.isArray(responseMessage.content)) {
           responseMessage.content.push({ type: ContentTypes.ERROR, [ContentTypes.ERROR]: message });

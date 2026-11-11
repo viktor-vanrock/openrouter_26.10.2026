@@ -1,6 +1,5 @@
 import { useModelSelectorContext } from './ModelSelectorContext';
 import { formatModelPrice } from './modelPricing';
-import { hasDevelopingCookie } from '~/utils/developingCookie';
 
 export default function ModelPriceLabel({
   modelId,
@@ -10,7 +9,7 @@ export default function ModelPriceLabel({
   endpoint?: string | null;
 }) {
   const { modelPrices } = useModelSelectorContext();
-  if (!hasDevelopingCookie() || endpoint !== 'OpenRouter' || !modelId) return null;
+  if (endpoint !== 'OpenRouter' || !modelId) return null;
   const price = modelPrices?.[modelId];
   if (!price) return null;
 

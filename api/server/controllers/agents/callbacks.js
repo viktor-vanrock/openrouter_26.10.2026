@@ -617,9 +617,8 @@ function createToolEndCallback({ req, res, artifactPromises, streamId = null }) 
                 context: FileContext.image_generation,
               });
             } catch (error) {
-              if (req.cookies?.developing === '1' &&
-                  (output.name === 'openrouter_image_gen' ||
-                    (output.name === 'openrouter' && req.body?.endpoint === 'OpenRouter'))) {
+              if (output.name === 'openrouter_image_gen' ||
+                  (output.name === 'openrouter' && req.body?.endpoint === 'OpenRouter')) {
                 const knownErrors = {
                   EACCES: 'Permission denied', EPERM: 'Operation not permitted',
                   ENOSPC: 'No space left on device', EROFS: 'Read-only filesystem',

@@ -9,8 +9,7 @@ function getOpenRouterImageConfig(env = process.env) {
 
 function isDirectImageRequest(req) {
   return (
-    req?.cookies?.developing === '1' &&
-    req.body?.endpoint === 'OpenRouter' &&
+    req?.body?.endpoint === 'OpenRouter' &&
     req.body?.image_generation_direct === true
   );
 }

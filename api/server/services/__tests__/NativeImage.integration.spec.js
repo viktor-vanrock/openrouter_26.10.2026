@@ -179,7 +179,6 @@ describe('OpenRouter image generation on an ordinary chat', () => {
     process.env.OPENROUTER_IMAGE_MODEL = 'resolved-model';
     fake = await startFakeOpenAI({ nativeImage: true });
     const req = {
-      cookies: { developing: '1' },
       user: { id: 'user_1', tenantId: 'tenant_1' },
       body: { conversationId: 'conversation_1', messageId: 'message_1', model: 'selected-model',
         endpoint: 'OpenRouter', image_generation_direct: true },
@@ -211,26 +210,25 @@ describe('OpenRouter image generation on an ordinary chat', () => {
     expect(await Promise.all(client.artifactPromises)).toEqual([expect.objectContaining({ file_id: 'saved_image' })]);
   });
 
-  it('rejects a direct OpenRouter image tool call without the developing cookie', async () => {
+  it('still requires endpoint configuration for an image tool call', async () => {
     const OpenRouterImageGen = require('~/app/clients/tools/structured/OpenRouterImageGen');
     const tool = new OpenRouterImageGen({ req: { cookies: {} }, userId: 'user_1', model: 'model' });
-    await expect(tool._call({ prompt: 'A tiger' })).rejects.toThrow('image generation is unavailable');
+    await expect(tool._call({ prompt: 'A tiger' })).rejects.toThrow('image generation is not configured');
   });
 
-  it('does not add the OpenRouter image tool without the developing cookie', async () => {
+  it('adds the selected OpenRouter image tool without the developing cookie', async () => {
     const agent = await mockApi.loadEphemeralAgent({
       req: { user: { id: 'user_1' }, cookies: {}, body: { ephemeralAgent: { image_generation: true } },
         config: { endpoints: { custom: [] } } },
       endpoint: 'OpenRouter', model_parameters: { model: 'model' },
     }, { getAgent: jest.fn(), getMCPServerTools: jest.fn() });
-    expect(agent.tools).not.toContain('openrouter_image_gen');
-    expect(agent.instructions ?? '').not.toContain('openrouter_image_gen');
+    expect(agent.tools).toContain('openrouter_image_gen');
+    expect(agent.instructions ?? '').toContain('openrouter_image_gen');
   });
 
   it('passes the OpenRouter image tool to an ordinary chat model', async () => {
     fake = await startFakeOpenAI({ noToolCall: true });
     const req = {
-      cookies: { developing: '1' },
       user: { id: 'user_1', tenantId: 'tenant_1' },
       body: {
         conversationId: 'conversation_1',
@@ -304,7 +302,6 @@ describe('OpenRouter image generation on an ordinary chat', () => {
   it('saves a native OpenRouter image returned by an ordinary chat model', async () => {
     fake = await startFakeOpenAI({ nativeImage: true });
     const req = {
-      cookies: { developing: '1' },
       user: { id: 'user_1', tenantId: 'tenant_1' },
       body: {
         conversationId: 'conversation_1',
@@ -374,7 +371,6 @@ describe('OpenRouter image generation on an ordinary chat', () => {
   it('saves a native OpenRouter image returned over a stream', async () => {
     fake = await startFakeOpenAI({ nativeImage: true });
     const req = {
-      cookies: { developing: '1' },
       user: { id: 'user_1', tenantId: 'tenant_1' },
       body: {
         conversationId: 'conversation_1',
@@ -441,7 +437,6 @@ describe('OpenRouter image generation on an ordinary chat', () => {
     fake = await startFakeOpenAI({ nativeImage: true });
     require('~/server/services/Files/process').saveBase64Image.mockRejectedValueOnce(Object.assign(new Error('denied'), { code: 'EACCES' }));
     const req = {
-      cookies: { developing: '1' },
       user: { id: 'user_1', tenantId: 'tenant_1' },
       body: {
         conversationId: 'conversation_1',
@@ -530,7 +525,6 @@ describe('OpenRouter image generation on an ordinary chat', () => {
     });
     require('~/models').getUserKeyValues.mockResolvedValue({ apiKey: 'user-openrouter-key' });
     const req = {
-      cookies: { developing: '1' },
       user: { id: 'user_1', tenantId: 'tenant_1' },
       body: {
         conversationId: 'conversation_1',

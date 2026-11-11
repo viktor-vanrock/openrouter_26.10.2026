@@ -1,6 +1,6 @@
 import { imageModeAvailability } from './imageModeAvailability';
 
-const base = { developing: true, endpoint: 'OpenRouter', model: 'example/model' };
+const base = { endpoint: 'OpenRouter', model: 'example/model' };
 
 describe('imageModeAvailability', () => {
   it('treats absent metadata or parameters as unsupported', () => {
@@ -21,8 +21,8 @@ describe('imageModeAvailability', () => {
     ).toBe(false);
   });
 
-  it('requires the developing cookie and OpenRouter', () => {
-    expect(imageModeAvailability({ ...base, developing: false }).eligible).toBe(false);
+  it('requires OpenRouter and a selected model', () => {
+    expect(imageModeAvailability({ ...base, model: '' }).eligible).toBe(false);
     expect(imageModeAvailability({ ...base, endpoint: 'other' }).eligible).toBe(false);
   });
 

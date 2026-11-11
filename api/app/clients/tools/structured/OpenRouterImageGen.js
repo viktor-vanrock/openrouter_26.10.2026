@@ -53,8 +53,6 @@ class OpenRouterImageGen extends StructuredTool {
   }
 
   async _call({ prompt }, _runManager, config) {
-    if (this.req?.cookies?.developing !== '1')
-      throw new Error('OpenRouter image generation is unavailable.');
     const endpoint = this.req?.config?.endpoints?.custom?.find(
       (item) => item.name?.toLowerCase() === 'openrouter',
     );

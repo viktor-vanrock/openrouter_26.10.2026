@@ -233,7 +233,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     summarizationOptions,
     aggregateContent,
     toolEndCallback,
-    nativeImageCallback: req.cookies?.developing === '1' && req.body?.endpoint === 'OpenRouter' ? toolEndCallback : null,
+    nativeImageCallback: req.body?.endpoint === 'OpenRouter' ? toolEndCallback : null,
     collectedUsage,
     collectedThoughtSignatures,
     streamId,

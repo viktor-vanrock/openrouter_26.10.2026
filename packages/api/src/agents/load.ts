@@ -29,7 +29,6 @@ export interface LoadAgentDeps {
 export interface LoadAgentParams {
   req: {
     user?: { id?: string };
-    cookies?: { developing?: string };
     config?: AppConfig;
     body?: {
       promptPrefix?: string;
@@ -79,7 +78,7 @@ export async function loadEphemeralAgent(
     tools.push(Tools.web_search);
   }
   const imageGenerationEnabled =
-    req.cookies?.developing === '1' && ephemeralAgent?.image_generation === true && endpoint === 'OpenRouter';
+    ephemeralAgent?.image_generation === true && endpoint === 'OpenRouter';
   if (imageGenerationEnabled) {
     tools.push('openrouter_image_gen');
   }

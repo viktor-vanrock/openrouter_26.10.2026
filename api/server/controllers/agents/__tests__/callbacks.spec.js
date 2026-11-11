@@ -91,8 +91,7 @@ describe('createToolEndCallback', () => {
     };
     const metadata = { run_id: 'run', thread_id: 'thread' };
 
-    it('returns a marker and safe diagnostics only with developing enabled', async () => {
-      req.cookies = { developing: '1' };
+    it('returns a marker and safe diagnostics without a cookie', async () => {
       const failure = Object.assign(new Error('private secret'), { code: 'EACCES' });
       require('~/server/services/Files/process').saveBase64Image.mockRejectedValueOnce(failure);
       await createToolEndCallback({ req, res, artifactPromises })({ output }, metadata);
@@ -103,11 +102,10 @@ describe('createToolEndCallback', () => {
       expect(JSON.stringify(logger.error.mock.calls)).not.toContain('private secret');
     });
 
-    it.each([{ cookies: undefined, name: 'openrouter_image_gen' },
-      { cookies: { developing: '1' }, name: 'another_image_tool' },
+    it.each([{ cookies: undefined, name: 'another_image_tool' },
       { cookies: undefined, name: 'openrouter' },
       { cookies: { developing: '1' }, name: 'openrouter' }])(
-      'keeps previous behavior outside the experiment', async ({ cookies, name }) => {
+      'keeps previous behavior for other tools and endpoints', async ({ cookies, name }) => {
         req.cookies = cookies;
         require('~/server/services/Files/process').saveBase64Image.mockRejectedValueOnce(new Error('failure'));
         await createToolEndCallback({ req, res, artifactPromises })({ output: { ...output, name } }, metadata);

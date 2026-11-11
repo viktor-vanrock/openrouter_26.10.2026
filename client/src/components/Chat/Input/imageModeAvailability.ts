@@ -2,12 +2,10 @@ import { isImageOutputCapableModel, isToolsCapableModel } from 'librechat-data-p
 import type { ModelInfo } from 'librechat-data-provider';
 
 export function imageModeAvailability({
-  developing,
   endpoint,
   model,
   metadata,
 }: {
-  developing: boolean;
   endpoint?: string | null;
   model?: string | null;
   metadata?: ModelInfo;
@@ -15,6 +13,6 @@ export function imageModeAvailability({
   const supportsTools = metadata != null && isToolsCapableModel(metadata);
   const outputsImage = metadata != null && isImageOutputCapableModel(metadata);
   return {
-    eligible: developing && endpoint === 'OpenRouter' && !!model && !supportsTools && !outputsImage,
+    eligible: endpoint === 'OpenRouter' && !!model && !supportsTools && !outputsImage,
   };
 }

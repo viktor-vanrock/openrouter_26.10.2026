@@ -19,7 +19,6 @@ import { mainTextareaId } from '~/common';
 import store from '~/store';
 import usePrototypeAvailability from '~/hooks/Prototype/usePrototypeAvailability';
 import useSetFilesToDelete from '~/hooks/Files/useSetFilesToDelete';
-import { hasDevelopingCookie } from '~/utils/developingCookie';
 
 export default function useSubmitMessage() {
   const { user } = useAuthContext();
@@ -297,7 +296,7 @@ export default function useSubmitMessage() {
 
   const submitImage = useCallback(
     async (data: { text: string }) => {
-      if (!hasDevelopingCookie() || (conversation?.endpoint as string | null | undefined) !== 'OpenRouter' ||
+      if ((conversation?.endpoint as string | null | undefined) !== 'OpenRouter' ||
         !data.text.trim() || prototypeMode || isSubmitting || imageSubmitInFlight.current) return;
       imageSubmitInFlight.current = true;
       try {

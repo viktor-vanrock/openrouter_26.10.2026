@@ -31,7 +31,6 @@ import PendingManualSkillsChips from './PendingManualSkillsChips';
 import { cn, getModelSpec, removeFocusRings } from '~/utils';
 import { useGetStartupConfig } from '~/data-provider';
 import { useGetModelCapabilitiesQuery } from 'librechat-data-provider/react-query';
-import { hasDevelopingCookie } from '~/utils/developingCookie';
 import { imageModeAvailability } from './imageModeAvailability';
 import ImageGenerateButton from './ImageGenerateButton';
 import { mainTextareaId, BadgeItem } from '~/common';
@@ -108,13 +107,11 @@ const ChatForm = memo(function ChatForm({
   } = useAddedChatContext();
   const assistantMap = useAssistantsMapContext();
   const { data: startupConfig } = useGetStartupConfig();
-  const developing = hasDevelopingCookie();
   const { data: modelCapabilities } = useGetModelCapabilitiesQuery({
     refetchOnMount: 'always',
-    enabled: developing && (conversation?.endpoint as string | null | undefined) === 'OpenRouter',
+    enabled: (conversation?.endpoint as string | null | undefined) === 'OpenRouter',
   });
   const imageModeStatus = imageModeAvailability({
-    developing,
     endpoint: conversation?.endpoint,
     model: conversation?.model,
     metadata: (modelCapabilities?.[conversation?.endpoint ?? ''] ?? []).find(

@@ -72,11 +72,7 @@ it('does not expose an Axios error containing credentials', async () => {
   await expect(result).rejects.toThrow('Не удалось выполнить запрос на создание изображения');
 });
 
-it('never sends an image request without the cookie', async () => {
-  await expect(
-    tool({ apiKey: 'user_provided', baseURL: 'https://server.example/v1' }, {})._call({
-      prompt: 'A cat',
-    }),
-  ).rejects.toThrow('unavailable');
-  expect(axios.post).not.toHaveBeenCalled();
+it('sends an image request without the cookie', async () => {
+  await tool({ apiKey: 'user_provided', baseURL: 'https://server.example/v1' }, {})._call({ prompt: 'A cat' });
+  expect(axios.post).toHaveBeenCalledTimes(1);
 });

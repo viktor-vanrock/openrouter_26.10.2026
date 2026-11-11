@@ -108,12 +108,12 @@ it('requests one direct image turn and leaves the next ordinary turn unmarked', 
   expect(mockReset).toHaveBeenCalledTimes(2);
 });
 
-it('does not generate images without the developing cookie', async () => {
+it('generates images without the developing cookie', async () => {
   mockMode = false;
   const { result } = renderHook(() => useSubmitMessage(), { wrapper });
   await act(async () => { await result.current.submitImage({ text: 'Кот' }); });
-  expect(mockAsk).not.toHaveBeenCalled();
-  expect(mockReset).not.toHaveBeenCalled();
+  expect(mockAsk).toHaveBeenCalledWith({ text: 'Кот' }, { directImage: true });
+  expect(mockReset).toHaveBeenCalledTimes(1);
 });
 
 it('ignores a second image click before the first submission completes', async () => {

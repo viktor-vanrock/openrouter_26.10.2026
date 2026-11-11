@@ -36,7 +36,6 @@ import store, { useGetEphemeralAgent } from '~/store';
 import { startupConfigKey } from '~/data-provider';
 import useUserKey from '~/hooks/Input/useUserKey';
 import { useAuthContext } from '~/hooks';
-import { hasDevelopingCookie } from '~/utils/developingCookie';
 
 const logChatRequest = (request: Record<string, unknown>) => {
   logger.log('=====================================\nAsk function called with:');
@@ -72,7 +71,7 @@ export default function useChatFunctions({
   const queryClient = useQueryClient();
   const { data: modelCapabilities } = useGetModelCapabilitiesQuery({
     refetchOnMount: 'always',
-    enabled: hasDevelopingCookie() && (immutableConversation?.endpoint as string | null | undefined) === 'OpenRouter',
+    enabled: (immutableConversation?.endpoint as string | null | undefined) === 'OpenRouter',
   });
   const setFilesToDelete = useSetFilesToDelete();
   const getEphemeralAgent = useGetEphemeralAgent();
@@ -141,7 +140,7 @@ export default function useChatFunctions({
       console.error('No endpoint available');
       return;
     }
-    const directImage = directImageRequested && hasDevelopingCookie() && endpoint === 'OpenRouter';
+    const directImage = directImageRequested && endpoint === 'OpenRouter';
 
     conversationId = conversationId ?? conversation?.conversationId ?? null;
     if (conversationId == 'search') {
@@ -248,7 +247,7 @@ export default function useChatFunctions({
     const selectedModelInfo = (modelCapabilities?.[endpoint ?? ''] ?? []).find(
       (item) => item.id === convo?.model,
     );
-    const submissionEphemeralAgent = hasDevelopingCookie() && endpoint === 'OpenRouter'
+    const submissionEphemeralAgent = endpoint === 'OpenRouter'
       ? {
           ...ephemeralAgent,
           image_generation: !directImage && selectedModelInfo != null &&

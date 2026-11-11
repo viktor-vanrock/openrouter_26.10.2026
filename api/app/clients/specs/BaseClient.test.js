@@ -550,11 +550,11 @@ describe('BaseClient', () => {
       }), expect.anything());
     });
 
-    test('does not emit the image save message without the cookie', async () => {
+    test('emits the image save message without the cookie', async () => {
       TestClient.options = { ...TestClient.options, req: { cookies: {} } };
       TestClient.artifactPromises = [Promise.resolve({ openrouterImageSaveFailed: true })];
       const response = await TestClient.sendMessage(userMessage);
-      expect(response.text).not.toContain('Изображение создано, но не удалось его сохранить');
+      expect(response.text).toContain('Изображение создано, но не удалось его сохранить');
     });
 
     test('sendMessage should return a response message', async () => {
