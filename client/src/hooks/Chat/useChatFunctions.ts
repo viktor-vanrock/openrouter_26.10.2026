@@ -14,7 +14,10 @@ import {
   replaceSpecialVars,
   isAssistantsEndpoint,
   getDefaultParamsEndpoint,
+  isImageOutputCapableModel,
+  isToolsCapableModel,
 } from 'librechat-data-provider';
+import { useGetModelCapabilitiesQuery } from 'librechat-data-provider/react-query';
 import type {
   TMessage,
   TSubmission,
@@ -66,6 +69,10 @@ export default function useChatFunctions({
   const getSender = useGetSender();
   const { user } = useAuthContext();
   const queryClient = useQueryClient();
+  const { data: modelCapabilities } = useGetModelCapabilitiesQuery({
+    refetchOnMount: 'always',
+    enabled: (immutableConversation?.endpoint as string | null | undefined) === 'OpenRouter',
+  });
   const setFilesToDelete = useSetFilesToDelete();
   const getEphemeralAgent = useGetEphemeralAgent();
   const isTemporary = useRecoilValue(store.isTemporary);
@@ -116,6 +123,7 @@ export default function useChatFunctions({
       overrideFiles,
       overrideManualSkills,
       addedConvo,
+      directImage: directImageRequested = false,
     } = {},
   ) => {
     setShowStopButton(false);
@@ -127,11 +135,12 @@ export default function useChatFunctions({
 
     const conversation = cloneDeep(immutableConversation);
 
-    const endpoint = conversation?.endpoint;
+    const endpoint: string | null | undefined = conversation?.endpoint;
     if (endpoint === null) {
       console.error('No endpoint available');
       return;
     }
+    const directImage = directImageRequested && endpoint === 'OpenRouter';
 
     conversationId = conversationId ?? conversation?.conversationId ?? null;
     if (conversationId == 'search') {
@@ -156,7 +165,7 @@ export default function useChatFunctions({
      *    a prior turn, not compose a new one).
      *  - Fresh submit тЖТ drain the per-convo atom into the message.
      */
-    let manualSkills = overrideManualSkills;
+    let manualSkills = directImage ? [] : overrideManualSkills;
     if (manualSkills == null) {
       manualSkills =
         isRegenerate || isContinued || isEdited
@@ -235,6 +244,16 @@ export default function useChatFunctions({
       },
       convo,
     ) as TEndpointOption;
+    const selectedModelInfo = (modelCapabilities?.[endpoint ?? ''] ?? []).find(
+      (item) => item.id === convo?.model,
+    );
+    const submissionEphemeralAgent = endpoint === 'OpenRouter'
+      ? {
+          ...ephemeralAgent,
+          image_generation: !directImage && selectedModelInfo != null &&
+            !isImageOutputCapableModel(selectedModelInfo) && isToolsCapableModel(selectedModelInfo),
+        }
+      : ephemeralAgent;
     if (endpoint !== EModelEndpoint.agents) {
       endpointOption.key = getExpiry();
       endpointOption.thread_id = thread_id;
@@ -269,7 +288,9 @@ export default function useChatFunctions({
       submissionFiles &&
       submissionFiles.length > 0;
 
-    if (setFiles && reuseFiles === true) {
+    if (directImage) {
+      // Keep pending attachments in the composer for the next ordinary message.
+    } else if (setFiles && reuseFiles === true) {
       currentMsg.files = [...submissionFiles];
       setFiles(new Map());
       setFilesToDelete({});
@@ -385,7 +406,8 @@ export default function useChatFunctions({
       isRegenerate,
       initialResponse,
       isTemporary,
-      ephemeralAgent,
+      ephemeralAgent: submissionEphemeralAgent,
+      ...(directImage ? { image_generation_direct: true } : {}),
       editedContent,
       addedConvo,
       manualSkills: manualSkills.length > 0 ? manualSkills : undefined,

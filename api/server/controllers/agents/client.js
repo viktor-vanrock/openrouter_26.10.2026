@@ -66,6 +66,7 @@ const { getMCPServerTools } = require('~/server/services/Config');
 const BaseClient = require('~/app/clients/BaseClient');
 const { getMCPManager } = require('~/config');
 const db = require('~/models');
+const { isDirectImageRequest } = require('~/server/services/Endpoints/agents/openrouterImageConfig');
 
 const loadAgent = (params) => loadAgentFn(params, { getAgent: db.getAgent, getMCPServerTools });
 
@@ -186,9 +187,12 @@ class AgentClient extends BaseClient {
   checkVisionRequest() {}
 
   getSaveOptions() {
+    const directImage = isDirectImageRequest(this.options.req);
     let runOptions = {};
     try {
-      runOptions = payloadParser(this.options) ?? {};
+      runOptions = { ...(directImage
+        ? this.options.req.imageGenerationConversationParameters
+        : payloadParser(this.options)) };
     } catch (error) {
       logger.error(
         '[api/server/controllers/agents/client.js #getSaveOptions] Error parsing options',
@@ -199,10 +203,12 @@ class AgentClient extends BaseClient {
     return removeNullishValues(
       Object.assign(
         {
-          spec: this.options.spec,
+          spec: directImage ? this.options.req.imageGenerationConversationSpec : this.options.spec,
           iconURL: this.options.iconURL,
           endpoint: this.options.endpoint,
-          agent_id: this.options.agent.id,
+          agent_id: directImage
+            ? this.options.req.resolvedConversation?.agent_id
+            : this.options.agent.id,
           modelLabel: this.options.modelLabel,
           resendFiles: this.options.resendFiles,
           imageDetail: this.options.imageDetail,
@@ -252,6 +258,18 @@ class AgentClient extends BaseClient {
       mapMethod: createMultiAgentMapper(this.options.agent, this.agentConfigs),
       mapCondition: (message) => message.addedConvo === true,
     });
+    const directImage = isDirectImageRequest(this.options.req);
+    if (directImage) {
+      const latest = orderedMessages[orderedMessages.length - 1];
+      const text = typeof latest?.text === 'string' ? latest.text : '';
+      const tokenCount = countTokens(text);
+      this.indexTokenCountMap = { 0: tokenCount };
+      return {
+        prompt: [{ role: 'user', content: text }],
+        tokenCountMap: latest?.messageId ? { [latest.messageId]: tokenCount } : {},
+        promptTokens: tokenCount,
+      };
+    }
 
     let payload;
     /** @type {number | undefined} */
@@ -898,6 +916,11 @@ class AgentClient extends BaseClient {
         skillPrimeResult?.skills,
         formatOptions,
       );
+      if (isDirectImageRequest(this.options.req)) {
+        initialMessages = initialMessages.filter((message) => message._getType() === 'human').slice(-1);
+        this.options.agent.instructions = undefined;
+        this.options.agent.additional_instructions = undefined;
+      }
       if (boundaryTokenAdjustment) {
         logger.debug(
           `[AgentClient] Boundary token adjustment: ${boundaryTokenAdjustment.original} → ${boundaryTokenAdjustment.adjusted} (${boundaryTokenAdjustment.remainingChars}/${boundaryTokenAdjustment.totalChars} chars)`,

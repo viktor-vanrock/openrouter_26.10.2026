@@ -33,6 +33,7 @@ const {
   StructuredWolfram,
   TavilySearchResults,
   createGeminiImageTool,
+  OpenRouterImageGen,
   createOpenAIImageTools,
   CreatePrototype,
 } = require('../');
@@ -230,6 +231,11 @@ const loadTools = async ({
         fileStrategy,
       });
     },
+    openrouter_image_gen: async () =>
+      new OpenRouterImageGen({
+        req: options.req,
+        userId: user,
+      }),
   };
 
   const requestedTools = {};

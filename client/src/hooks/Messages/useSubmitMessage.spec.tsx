@@ -82,6 +82,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 beforeEach(() => {
+  document.cookie = 'developing=; Max-Age=0; path=/';
   jest.clearAllMocks();
   mockDraft = '';
   mockMode = true;
@@ -92,6 +93,37 @@ beforeEach(() => {
   (dataService.getConversationById as jest.Mock).mockImplementation((id: string) =>
     Promise.resolve({ conversationId: id, model: 'fake/model', endpoint: 'OpenRouter' }),
   );
+});
+
+it('requests one direct image turn and leaves the next ordinary turn unmarked', async () => {
+  document.cookie = 'developing=1; path=/';
+  mockMode = false;
+  const { result } = renderHook(() => useSubmitMessage(), { wrapper });
+  await act(async () => {
+    await result.current.submitImage({ text: 'Кот' });
+    await result.current.submitMessage({ text: 'Привет' });
+  });
+  expect(mockAsk).toHaveBeenNthCalledWith(1, { text: 'Кот' }, { directImage: true });
+  expect(mockAsk).toHaveBeenNthCalledWith(2, { text: 'Привет' }, { addedConvo: undefined });
+  expect(mockReset).toHaveBeenCalledTimes(2);
+});
+
+it('generates images without the developing cookie', async () => {
+  mockMode = false;
+  const { result } = renderHook(() => useSubmitMessage(), { wrapper });
+  await act(async () => { await result.current.submitImage({ text: 'Кот' }); });
+  expect(mockAsk).toHaveBeenCalledWith({ text: 'Кот' }, { directImage: true });
+  expect(mockReset).toHaveBeenCalledTimes(1);
+});
+
+it('ignores a second image click before the first submission completes', async () => {
+  document.cookie = 'developing=1; path=/';
+  mockMode = false;
+  const { result } = renderHook(() => useSubmitMessage(), { wrapper });
+  await act(async () => {
+    await Promise.all([result.current.submitImage({ text: 'Кот' }), result.current.submitImage({ text: 'Кот' })]);
+  });
+  expect(mockAsk).toHaveBeenCalledTimes(1);
 });
 
 it('keeps Prototype mode in the created conversation without sending an ordinary chat request', async () => {

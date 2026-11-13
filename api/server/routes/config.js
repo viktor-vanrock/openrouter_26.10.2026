@@ -257,6 +257,7 @@ router.get('/', async function (req, res) {
       ...preLoginPayload,
       ...publicSharePayload,
       ...buildPostLoginPayload(),
+      openrouterImage: require('~/server/services/Endpoints/agents/openrouterImageConfig').getOpenRouterImageConfig(),
       socialLogins: appConfig?.registration?.socialLogins ?? defaultSocialLogins,
       interface: appConfig?.interfaceConfig,
       turnstile: appConfig?.turnstileConfig,

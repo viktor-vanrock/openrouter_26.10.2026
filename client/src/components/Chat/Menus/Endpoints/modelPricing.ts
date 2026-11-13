@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
-import { hasDevelopingCookie } from '~/utils/developingCookie';
 
 export type ModelPrice = {
   promptPerMillion?: number;
@@ -15,7 +14,6 @@ type PricingResponse = {
 export function useModelPrices() {
   return useQuery({
     queryKey: ['openrouter', 'model-prices'],
-    enabled: hasDevelopingCookie(),
     queryFn: async () => {
       const response = await axios.get<PricingResponse>('/api/openrouter/pricing');
       return Object.fromEntries(

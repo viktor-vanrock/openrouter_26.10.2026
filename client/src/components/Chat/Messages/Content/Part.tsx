@@ -165,7 +165,8 @@ const Part = memo(function Part({
       isToolCall &&
       (toolCall.name === 'image_gen_oai' ||
         toolCall.name === 'image_edit_oai' ||
-        toolCall.name === 'gemini_image_gen')
+        toolCall.name === 'gemini_image_gen' ||
+        toolCall.name === 'openrouter_image_gen')
     ) {
       return (
         <ImageGen

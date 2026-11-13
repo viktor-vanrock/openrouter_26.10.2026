@@ -33,10 +33,11 @@ class ModelEndHandler {
    *   providers don't emit `additional_kwargs.signatures`, so capture is also
    *   a no-op for them even when the map is provided.
    */
-  constructor(collectedUsage, collectedThoughtSignatures = null) {
+  constructor(collectedUsage, collectedThoughtSignatures = null, nativeImageCallback = null) {
     if (!Array.isArray(collectedUsage)) {
       throw new Error('collectedUsage must be an array');
     }
+    this.nativeImageCallback = nativeImageCallback;
     this.collectedUsage = collectedUsage;
     this.collectedThoughtSignatures = collectedThoughtSignatures;
   }
@@ -77,6 +78,19 @@ class ModelEndHandler {
           messageId: metadata.run_id,
           conversationId: metadata.thread_id,
         });
+      }
+
+      if (this.nativeImageCallback) {
+        const output = data?.output;
+        const images = [
+          ...(Array.isArray(output?.additional_kwargs?.openrouter_images) ? output.additional_kwargs.openrouter_images : []),
+          ...(Array.isArray(output?.content) ? output.content : []),
+        ];
+        const urls = [...new Set(images.map((image) => image?.image_url?.url ?? (image?.type === 'image' ? image.url : undefined))
+          .filter((url) => typeof url === 'string' && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/i.test(url) && url.length <= 40 * 1024 * 1024))];
+        if (urls.length) {
+          await this.nativeImageCallback({ output: { name: 'openrouter', artifact: { content: urls.map((url) => ({ type: 'image_url', image_url: { url } })) } } }, metadata);
+        }
       }
 
       const usage = data?.output?.usage_metadata;
@@ -218,6 +232,7 @@ function getDefaultHandlers({
   res,
   aggregateContent,
   toolEndCallback,
+  nativeImageCallback = null,
   collectedUsage,
   collectedThoughtSignatures = null,
   streamId = null,
@@ -231,7 +246,7 @@ function getDefaultHandlers({
     );
   }
   const handlers = {
-    [GraphEvents.CHAT_MODEL_END]: new ModelEndHandler(collectedUsage, collectedThoughtSignatures),
+    [GraphEvents.CHAT_MODEL_END]: new ModelEndHandler(collectedUsage, collectedThoughtSignatures, nativeImageCallback),
     [GraphEvents.TOOL_END]: new ToolEndHandler(toolEndCallback, logger),
     [GraphEvents.ON_RUN_STEP]: {
       /**
@@ -592,13 +607,35 @@ function createToolEndCallback({ req, res, artifactPromises, streamId = null }) 
           (async () => {
             const filename = `${output.name}_img_${nanoid()}`;
             const file_id = output.artifact.file_ids?.[i];
-            const file = await saveBase64Image(url, {
-              req,
-              file_id,
-              filename,
-              endpoint: metadata.provider,
-              context: FileContext.image_generation,
-            });
+            let file;
+            try {
+              file = await saveBase64Image(url, {
+                req,
+                file_id,
+                filename,
+                endpoint: metadata.provider,
+                context: FileContext.image_generation,
+              });
+            } catch (error) {
+              if (output.name === 'openrouter_image_gen' ||
+                  (output.name === 'openrouter' && req.body?.endpoint === 'OpenRouter')) {
+                const knownErrors = {
+                  EACCES: 'Permission denied', EPERM: 'Operation not permitted',
+                  ENOSPC: 'No space left on device', EROFS: 'Read-only filesystem',
+                  ETIMEDOUT: 'Operation timed out',
+                };
+                const code = typeof error?.code === 'string' ? error.code : '';
+                logger.error('[OpenRouter image] save failed', {
+                  operation: 'saveBase64Image',
+                  status: Number.isInteger(error?.$metadata?.httpStatusCode)
+                    ? error.$metadata.httpStatusCode : undefined,
+                  code: Object.hasOwn(knownErrors, code) ? code : undefined,
+                  message: knownErrors[code] ?? 'Image storage operation failed',
+                });
+                return { openrouterImageSaveFailed: true };
+              }
+              throw error;
+            }
             const fileMetadata = Object.assign(file, {
               messageId: metadata.run_id,
               toolCallId: output.tool_call_id,

@@ -77,6 +77,11 @@ export async function loadEphemeralAgent(
   if (ephemeralAgent?.web_search === true || modelSpec?.webSearch === true) {
     tools.push(Tools.web_search);
   }
+  const imageGenerationEnabled =
+    ephemeralAgent?.image_generation === true && endpoint === 'OpenRouter';
+  if (imageGenerationEnabled) {
+    tools.push('openrouter_image_gen');
+  }
 
   const addedServers = new Set<string>();
   if (mcpServers.size > 0) {
@@ -100,6 +105,15 @@ export async function loadEphemeralAgent(
     model_parameters as ModelParametersWithPromptPrefix;
   const instructions =
     typeof modelPromptPrefix === 'string' ? modelPromptPrefix : requestPromptPrefix;
+  const effectiveInstructions =
+    imageGenerationEnabled
+      ? [
+          instructions,
+          'Image generation is available through the openrouter_image_gen tool. When the user asks you to create, draw, or send an image, call this tool with a concise visual prompt. Do not refuse image requests and do not substitute ASCII art, SVG, code, or prompts for external image services. If the user asks for code that draws an image, provide code without calling the image tool.',
+        ]
+          .filter((value) => typeof value === 'string' && value.trim().length > 0)
+          .join('\n\n')
+      : instructions;
 
   // Get endpoint config for modelDisplayLabel fallback
   const endpoints = appConfig?.endpoints;
@@ -129,7 +143,7 @@ export async function loadEphemeralAgent(
 
   const result: Partial<Agent> = {
     id: ephemeralId,
-    instructions,
+    instructions: effectiveInstructions,
     provider: endpoint,
     model_parameters: safeModelParameters as AgentModelParameters,
     model,

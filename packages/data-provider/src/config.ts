@@ -1084,6 +1084,7 @@ export type TRumConfig = {
 export type StartupConfigContext = 'share';
 
 export type TStartupConfig = {
+  openrouterImage?: { model: string; description: string };
   appTitle: string;
   socialLogins?: string[];
   interface?: TInterfaceConfig;
@@ -1809,6 +1810,7 @@ export const imageGenTools = new Set([
   'stable-diffusion',
   'flux',
   'gemini_image_gen',
+  'openrouter_image_gen',
 ]);
 
 /**

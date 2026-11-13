@@ -57,7 +57,12 @@ export function getToolIconType(name: string): ToolIconType {
   if (name === 'web_search') {
     return 'web_search';
   }
-  if (name === 'image_gen_oai' || name === 'image_edit_oai' || name === 'gemini_image_gen') {
+  if (
+    name === 'image_gen_oai' ||
+    name === 'image_edit_oai' ||
+    name === 'gemini_image_gen' ||
+    name === 'openrouter_image_gen'
+  ) {
     return 'image_gen';
   }
   if (name === 'file_search' || name === 'retrieval') {

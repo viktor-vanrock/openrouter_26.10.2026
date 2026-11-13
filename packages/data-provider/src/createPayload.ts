@@ -13,6 +13,7 @@ export default function createPayload(submission: t.TSubmission) {
     conversation,
     editedContent,
     ephemeralAgent,
+    image_generation_direct,
     endpointOption,
     manualSkills,
   } = submission;
@@ -41,6 +42,7 @@ export default function createPayload(submission: t.TSubmission) {
     conversationId,
     isContinued: !!(isEdited && isContinued),
     ephemeralAgent: s.isAssistantsEndpoint(endpoint) ? undefined : ephemeralAgent,
+    ...(image_generation_direct === true ? { image_generation_direct: true } : {}),
     manualSkills: s.isAssistantsEndpoint(endpoint) ? undefined : manualSkills,
   };
 

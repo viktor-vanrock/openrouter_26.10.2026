@@ -84,6 +84,36 @@ describe('createToolEndCallback', () => {
     artifactPromises = [];
   });
 
+  describe('OpenRouter image save failure', () => {
+    const output = {
+      name: 'openrouter_image_gen',
+      artifact: { content: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,YQ==' } }] },
+    };
+    const metadata = { run_id: 'run', thread_id: 'thread' };
+
+    it('returns a marker and safe diagnostics without a cookie', async () => {
+      const failure = Object.assign(new Error('private secret'), { code: 'EACCES' });
+      require('~/server/services/Files/process').saveBase64Image.mockRejectedValueOnce(failure);
+      await createToolEndCallback({ req, res, artifactPromises })({ output }, metadata);
+      expect(await Promise.all(artifactPromises)).toEqual([{ openrouterImageSaveFailed: true }]);
+      expect(logger.error).toHaveBeenCalledWith('[OpenRouter image] save failed', expect.objectContaining({
+        operation: 'saveBase64Image', code: 'EACCES', message: 'Permission denied',
+      }));
+      expect(JSON.stringify(logger.error.mock.calls)).not.toContain('private secret');
+    });
+
+    it.each([{ cookies: undefined, name: 'another_image_tool' },
+      { cookies: undefined, name: 'openrouter' },
+      { cookies: { developing: '1' }, name: 'openrouter' }])(
+      'keeps previous behavior for other tools and endpoints', async ({ cookies, name }) => {
+        req.cookies = cookies;
+        require('~/server/services/Files/process').saveBase64Image.mockRejectedValueOnce(new Error('failure'));
+        await createToolEndCallback({ req, res, artifactPromises })({ output: { ...output, name } }, metadata);
+        expect(await Promise.all(artifactPromises)).toEqual([null]);
+      },
+    );
+  });
+
   describe('ui_resources artifact handling', () => {
     it('should process ui_resources artifact and return attachment when headers not sent', async () => {
       const toolEndCallback = createToolEndCallback({ req, res, artifactPromises });

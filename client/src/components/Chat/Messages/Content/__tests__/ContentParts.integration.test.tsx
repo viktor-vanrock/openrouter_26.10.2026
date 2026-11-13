@@ -153,6 +153,15 @@ describe('ContentParts integration: MCP image hoist and grouping', () => {
     isLatestMessage: true,
   };
 
+  it('renders an image returned directly by the model', () => {
+    renderContentParts({
+      ...baseProps,
+      content: [],
+      attachments: [{ ...imageAttachment(''), type: 'image/png' } as TAttachment],
+    });
+    expect(screen.getByTestId('attachment-group')).toHaveAttribute('data-count', '1');
+  });
+
   it('groups 2+ MCP tool calls and hoists their attachments outside the collapsible', () => {
     const content = [makeMcpToolCall('t1'), makeMcpToolCall('t2')];
     const attachments = [imageAttachment('t1', 'a.png'), imageAttachment('t2', 'b.png')];
