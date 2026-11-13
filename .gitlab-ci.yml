@@ -79,3 +79,9 @@ debug_k8s:
     - echo ""
     - echo "=== Helm history ==="
     - helm history $APP_NAME -n $APP_NAMESPACE || true
+    - echo "=== CronJob ==="
+    - kubectl get cronjob -n $APP_NAMESPACE || true
+    - echo "=== Jobs ==="
+    - kubectl get jobs -n $APP_NAMESPACE || true
+    - echo "=== CronJob in Helm release ==="
+    - helm get manifest $APP_NAME -n $APP_NAMESPACE | grep -n -i -B2 -A8 "kind.CronJob" || echo "CronJob в релизе НЕТ"

@@ -1,5 +1,12 @@
 replicaCount: 1
 
+healthCheck:
+  enabled: true
+  insecure: true
+  url: "https://orchat.sberai-rnd.ru/health"
+  # Замените плейсхолдер вручную на URL входящего вебхука.
+  webhookUrl: "https://mm.sberdevices.ru/hooks/nfie9bwfnpgfmpx4t9dujqijae"
+
 global:
   librechat:
     # Секреты приходят из Vault (podAnnotations ниже). Пустая строка, а не удаление:

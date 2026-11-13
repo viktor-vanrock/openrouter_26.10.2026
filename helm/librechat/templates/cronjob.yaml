@@ -1,0 +1,115 @@
+{{- if .Values.healthCheck.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ printf "%s-healthcheck" (include "librechat.fullname" . | trunc 40 | trimSuffix "-") }}
+  labels:
+    {{- include "librechat.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.healthCheck.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 60
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: {{ printf "%s-healthcheck" (include "librechat.fullname" . | trunc 40 | trimSuffix "-") }}
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            app.kubernetes.io/component: healthcheck
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.podSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if kindIs "bool" .Values.enableServiceLinks }}
+          enableServiceLinks: {{ .Values.enableServiceLinks }}
+          {{- end }}
+          {{- with .Values.hostAliases }}
+          hostAliases:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.dnsPolicy }}
+          dnsPolicy: {{ . | quote }}
+          {{- end }}
+          {{- with .Values.dnsConfig }}
+          dnsConfig:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: healthcheck
+              image: {{ .Values.healthCheck.image | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 1000
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                {{- toYaml .Values.healthCheck.resources | nindent 16 }}
+              env:
+                - name: HEALTH_CHECK_URL
+                  value: {{ required "healthCheck.url обязателен" .Values.healthCheck.url | quote }}
+                - name: MM_WEBHOOK_URL
+                  value: {{ required "healthCheck.webhookUrl обязателен" .Values.healthCheck.webhookUrl | quote }}
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  if curl -fsS --max-time 10 "$HEALTH_CHECK_URL" >/dev/null; then
+                    echo "LibreChat доступен"
+                    exit 0
+                  fi
+                  echo "Проверка LibreChat завершилась ошибкой" >&2
+                  {{- if .Values.healthCheck.insecure }}
+                  set -- --insecure
+                  {{- else if .Values.healthCheck.caConfigMap }}
+                  set -- --cacert /etc/healthcheck-ca/ca.crt
+                  {{- else }}
+                  set --
+                  {{- end }}
+                  if ! curl -fsS --max-time 10 "$@" \
+                    -H 'Content-Type: application/json' \
+                    --data "$(printf '{"text":"⚠️ LibreChat не отвечает: %s"}' "$HEALTH_CHECK_URL")" \
+                    "$MM_WEBHOOK_URL" >/dev/null; then
+                    echo "Не удалось отправить сообщение в Mattermost" >&2
+                  fi
+                  exit 1
+              {{- if .Values.healthCheck.caConfigMap }}
+              volumeMounts:
+                - name: mattermost-ca
+                  mountPath: /etc/healthcheck-ca
+                  readOnly: true
+              {{- end }}
+          {{- if .Values.healthCheck.caConfigMap }}
+          volumes:
+            - name: mattermost-ca
+              configMap:
+                name: {{ .Values.healthCheck.caConfigMap | quote }}
+                items:
+                  - key: ca.crt
+                    path: ca.crt
+          {{- end }}
+{{- end }}

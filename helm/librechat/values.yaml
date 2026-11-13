@@ -4,6 +4,25 @@
 
 replicaCount: 1
 
+# Проверка сайта по расписанию и уведомление в Mattermost.
+healthCheck:
+  enabled: false
+  schedule: "*/15 * * * *"
+  url: "https://chat.example.com/health"
+  image: "curlimages/curl:8.12.1"
+  webhookUrl: ""
+  # ConfigMap с файлом ca.crt для проверки сертификата Mattermost.
+  caConfigMap: ""
+  # Только для временной диагностики: отключает проверку TLS Mattermost.
+  insecure: false
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
 
 
 global:
