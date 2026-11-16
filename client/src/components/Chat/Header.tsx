@@ -146,7 +146,7 @@ function Header() {
     <div className="via-presentation/70 md:from-presentation/80 md:via-presentation/50 2xl:from-presentation/0 relative z-10 flex min-h-[52px] w-full shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b bg-presentation from-presentation to-transparent p-2 font-semibold text-text-primary 2xl:via-transparent">
       <div className="hide-scrollbar flex max-w-full min-w-0 flex-[1_0_auto] items-center gap-2 overflow-x-auto">
         <div className="mx-1 flex items-center">
-          <OpenSidebar className="md:hidden" />
+          {isSmallScreen ? <OpenSidebar /> : null}
           {!(navVisible && isSmallScreen) && (
             <div
               className={cn(

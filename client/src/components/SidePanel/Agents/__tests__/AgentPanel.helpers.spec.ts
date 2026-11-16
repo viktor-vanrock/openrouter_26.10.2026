@@ -1,7 +1,6 @@
 /**
  * @jest-environment jsdom
  */
-import { describe, it, expect, jest } from '@jest/globals';
 import { Constants, type Agent } from 'librechat-data-provider';
 import type { FieldNamesMarkedBoolean } from 'react-hook-form';
 import type { AgentForm } from '~/common';
@@ -79,7 +78,7 @@ describe('persistAvatarChanges', () => {
   it('returns false for ephemeral agents', async () => {
     const uploadAvatar = jest.fn<PersistAvatarChangesParams['uploadAvatar']>();
     const result = await persistAvatarChanges({
-      agentId: `${Constants.EPHEMERAL_AGENT_ID}`,
+      agentId: String(Constants.EPHEMERAL_AGENT_ID),
       avatarActionState: 'upload',
       avatarFile: new File(['avatar'], 'avatar.png', { type: 'image/png' }),
       uploadAvatar,

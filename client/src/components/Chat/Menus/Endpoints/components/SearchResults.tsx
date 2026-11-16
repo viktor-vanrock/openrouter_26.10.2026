@@ -4,8 +4,11 @@ import { CheckCircle2, EarthIcon } from 'lucide-react';
 import { isAgentsEndpoint, isAssistantsEndpoint } from 'librechat-data-provider';
 import type { TModelSpec } from 'librechat-data-provider';
 import type { Endpoint } from '~/common';
+import MarketplaceItem, { marketplaceSearchMatches } from './Marketplace';
 import { useModelSelectorContext } from '../ModelSelectorContext';
 import { CustomMenuItem as MenuItem } from '../CustomMenu';
+import { shouldRenderEndpointOption } from '../utils';
+import SpecDescription from './SpecDescription';
 import SpecIcon from './SpecIcon';
 import { cn } from '~/utils';
 import { PinnedButton } from './PinedButton';
@@ -104,9 +107,7 @@ export function SearchResults({ results, localize, searchValue }: SearchResultsP
                 )}
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="truncate text-left">{spec.label}</span>
-                  {spec.description && (
-                    <span className="break-words text-xs font-normal">{spec.description}</span>
-                  )}
+                  <SpecDescription description={spec.description} />
                 </div>
               </div>
               <ModelPriceLabel modelId={spec.preset.model} endpoint={spec.preset.endpoint} />
@@ -130,10 +131,12 @@ export function SearchResults({ results, localize, searchValue }: SearchResultsP
         } else {
           // For an endpoint item
           const endpoint = item as Endpoint;
+          if (!shouldRenderEndpointOption(endpoint)) {
+            return null;
+          }
 
-          if (endpoint.hasModels && endpoint.models && endpoint.models.length > 0) {
+          if (endpoint.hasModels) {
             const lowerQuery = searchValue.toLowerCase();
-
             const getSortedModel = () => {
               const {
                 endpoint: selectedEndpoint,
@@ -179,9 +182,14 @@ export function SearchResults({ results, localize, searchValue }: SearchResultsP
             };
             const sortedModels = getSortedModel();
 
-            const filteredModels = endpoint.label.toLowerCase().includes(lowerQuery)
-              ? sortedModels
-              : sortedModels.filter((model) => {
+            const endpointMatches = endpoint.label.toLowerCase().includes(lowerQuery);
+            const showMarketplace =
+              endpoint.showMarketplace === true &&
+              (endpointMatches || marketplaceSearchMatches(searchValue, localize));
+            const models = sortedModels;
+            const filteredModels = endpointMatches
+              ? models
+              : models.filter((model) => {
                   let modelName = model.name;
                   if (
                     isAgentsEndpoint(endpoint.value) &&
@@ -199,7 +207,7 @@ export function SearchResults({ results, localize, searchValue }: SearchResultsP
                   return modelName.toLowerCase().includes(lowerQuery);
                 });
 
-            if (!filteredModels.length) {
+            if (!filteredModels.length && !showMarketplace) {
               return null; // skip if no models match
             }
 
@@ -214,6 +222,12 @@ export function SearchResults({ results, localize, searchValue }: SearchResultsP
                   )}
                   {endpoint.label}
                 </div> */}
+                {showMarketplace && (
+                  <MarketplaceItem
+                    className="px-3 py-2 pl-6"
+                    label={localize('com_agents_marketplace')}
+                  />
+                )}
                 {filteredModels.map((model, index) => {
                   const modelId = model.name;
                   const isFavorite = isFavoriteModel(modelId ?? '', endpoint.value);

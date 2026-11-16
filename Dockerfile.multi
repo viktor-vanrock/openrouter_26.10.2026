@@ -7,6 +7,7 @@ ARG BUILD_COMMIT=
 ARG BUILD_BRANCH=
 ARG BUILD_DATE=
 
+# Base for all builds
 FROM node:24.16.0-alpine AS base-min
 ARG NPM_CI_TIMEOUT_SECONDS=1500
 ARG NPM_CI_ATTEMPTS=2
@@ -98,6 +99,7 @@ RUN case "${TARGETARCH:-$(node -p process.arch)}" in amd64|x64) task_sharp_cpu=x
 COPY api ./api
 COPY apps/prototype-service/src/shared-storage-config.cjs ./apps/prototype-service/src/shared-storage-config.cjs
 COPY config ./config
+COPY skill ./skill
 RUN mkdir -p ./skill ./api/logs ./uploads && chown -R 1000:2000 ./skill ./api/logs ./uploads
 COPY --from=build /app/packages/data-provider/dist ./packages/data-provider/dist
 COPY --from=build /app/packages/data-schemas/dist ./packages/data-schemas/dist

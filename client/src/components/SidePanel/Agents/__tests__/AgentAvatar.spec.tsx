@@ -2,7 +2,6 @@
  * @jest-environment jsdom
  */
 /* eslint-disable i18next/no-literal-string */
-import { describe, it, expect } from '@jest/globals';
 import { render, fireEvent } from '@testing-library/react';
 import { FormProvider, useForm, type UseFormReturn } from 'react-hook-form';
 import type { AgentForm } from '~/common';
@@ -96,7 +95,10 @@ describe('AgentAvatar reset menu', () => {
     const { getByTestId } = render(<Wrapper />);
     fireEvent.click(getByTestId('reset-avatar'));
 
-    if (!methodsRef) throw new Error('Form did not mount');
+    if (!methodsRef) {
+      throw new Error('Form methods were not initialized');
+    }
+
     expect(methodsRef.getValues('avatar_preview')).toBe('');
     expect(methodsRef.getValues('avatar_file')).toBeNull();
     expect(methodsRef.getValues('avatar_action')).toBe('reset');

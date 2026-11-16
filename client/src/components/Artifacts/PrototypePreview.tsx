@@ -59,7 +59,7 @@ export default function PrototypePreview({
           ]
             .map(
               (variant) =>
-                `button[class~="bg-[var(--btn-${variant}-bg)]"]:not(:disabled) { color: var(--btn-${variant}-color); }`,
+                `button[class~="${'bg-'}[var(--btn-${variant}-bg)]"]:not(:disabled) { color: var(--btn-${variant}-color); }`,
             )
             .join('\n') +
           '\n' +
