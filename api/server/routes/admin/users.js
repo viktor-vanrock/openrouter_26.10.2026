@@ -1,13 +1,25 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { webcrypto } = require('node:crypto');
-const { createAdminUsersHandlers, checkEmailConfig } = require('@librechat/api');
+const mongoose = require('mongoose');
+const {
+  createAdminUsersHandlers,
+  checkEmailConfig,
+  revokeUserCodeEnvironmentWorkers,
+} = require('@librechat/api');
 const { logger, SystemCapabilities } = require('@librechat/data-schemas');
 const { requireCapability } = require('~/server/middleware/roles/capabilities');
 const { requireJwtAuth } = require('~/server/middleware');
 const { getUserById, createToken, deleteTokens } = require('~/models');
 const { sendEmail } = require('~/server/utils');
+const {
+  drainAgentTriggerDeliveriesForUser,
+  prepareAgentTriggerUserPurge,
+  cancelAgentTriggerUserPurge,
+  purgeAgentTriggerDeliveriesForUser,
+} = require('~/server/services/Agents/triggers');
 const db = require('~/models');
+const { getAppConfig, invalidateCodeEnvironmentConfigCache } = require('~/server/services/Config');
 
 const router = express.Router();
 
@@ -19,7 +31,21 @@ const handlers = createAdminUsersHandlers({
   findUsers: db.findUsers,
   countUsers: db.countUsers,
   updateUser: db.updateUser,
+  beginAgentTriggerUserDeletion: db.beginAgentTriggerUserDeletion,
+  cancelAgentTriggerUserDeletion: db.cancelAgentTriggerUserDeletion,
+  drainAgentTriggerDeliveriesForUser,
+  prepareAgentTriggerUserPurge,
+  cancelAgentTriggerUserPurge,
+  purgeAgentTriggerDeliveriesForUser,
+  revokeUserCodeEnvironmentWorkers: async (userId) =>
+    revokeUserCodeEnvironmentWorkers({
+      mongoose,
+      userId,
+      appConfig: await getAppConfig({ baseOnly: true }),
+    }),
   deleteUserById: db.deleteUserById,
+  deleteUserCodeEnvironments: db.deleteUserCodeEnvironments,
+  invalidateCodeEnvironmentConfigCache,
   deleteConfig: db.deleteConfig,
   deleteAclEntries: db.deleteAclEntries,
 });
@@ -51,8 +77,8 @@ router.post('/:id/reset-password', requireManageUsers, async (req, res) => {
       expiresIn: 900,
     });
 
-    const clientDomain = process.env.DOMAIN_CLIENT ||
-    (req.headers.origin ?? `${req.protocol}://${req.get('host')}`);
+    const clientDomain =
+      process.env.DOMAIN_CLIENT || (req.headers.origin ?? `${req.protocol}://${req.get('host')}`);
     const link = `${clientDomain}/reset-password?token=${resetToken}&userId=${user._id}`;
 
     const emailEnabled = checkEmailConfig();

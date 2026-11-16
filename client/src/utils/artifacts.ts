@@ -1,24 +1,41 @@
 import dedent from 'dedent';
-import { excelMimeTypes, shadcnComponents } from 'librechat-data-provider';
+import filenamify from 'filenamify';
+import { gfm } from 'micromark-extension-gfm';
+import { gfmFromMarkdown } from 'mdast-util-gfm';
+import { fromMarkdown } from 'mdast-util-from-markdown';
+import {
+  excelMimeTypes,
+  shadcnComponents,
+  getDocumentFileExtension,
+} from 'librechat-data-provider';
 import type {
   SandpackProviderProps,
   SandpackPredefinedTemplate,
 } from '@codesandbox/sandpack-react';
 import type { TStartupConfig, TAttachment, TFile } from 'librechat-data-provider';
+import type { PhrasingContent } from 'mdast';
+import type { TranslationKeys } from '~/hooks/useLocalize';
 import type { Artifact } from '~/common';
+import { MERMAID_ARTIFACT_TYPE } from '~/common/artifacts';
+import { getCodeBlockFilename } from './downloadFile';
 
 const artifactFilename = {
   'application/vnd.react': 'App.tsx',
   'application/vnd.ant.react': 'App.tsx',
   'text/html': 'index.html',
   'application/vnd.code-html': 'index.html',
-  /* Office preview buckets тАФ the backend produces a complete sanitized
+  /* Office preview buckets — the backend produces a complete sanitized
    * `index.html` document (head + body) and ships it via `attachment.text`.
    * The Sandpack `static` template loads it as-is. See
    * `packages/api/src/files/documents/html.ts`. */
   'application/vnd.librechat.docx-preview': 'index.html',
   'application/vnd.librechat.spreadsheet-preview': 'index.html',
   'application/vnd.librechat.presentation-preview': 'index.html',
+  /* SVG artifacts are a bare `<svg>` document. The Sandpack `static`
+   * template always loads `index.html`, so `getSvgFiles` ships a
+   * companion HTML shell; the editor/download file stays `index.svg`. */
+  'image/svg+xml': 'index.svg',
+  'image/svg': 'index.svg',
   // mermaid and markdown types are handled separately in useArtifactProps.ts
   default: 'index.html',
   // 'css': 'css',
@@ -42,7 +59,7 @@ const artifactTemplate: Record<
   'application/vnd.ant.react': 'react-ts',
   'application/vnd.mermaid': 'react-ts',
   'application/vnd.code-html': 'static',
-  /* CODE bucket reuses the static markdown pipeline тАФ `useArtifactProps`
+  /* CODE bucket reuses the static markdown pipeline — `useArtifactProps`
    * pre-wraps the content in a fenced block and hands it to
    * `getMarkdownFiles`, so the rendered HTML uses the same `marked`
    * pipeline as `.md` artifacts. Keeping `static` (vs. `react-ts`) means
@@ -51,11 +68,13 @@ const artifactTemplate: Record<
   'text/markdown': 'static',
   'text/md': 'static',
   'text/plain': 'static',
-  /* Office preview buckets ride the same static pipeline тАФ the backend
+  /* Office preview buckets ride the same static pipeline — the backend
    * already sanitized the HTML, so we just hand it to Sandpack. */
   'application/vnd.librechat.docx-preview': 'static',
   'application/vnd.librechat.spreadsheet-preview': 'static',
   'application/vnd.librechat.presentation-preview': 'static',
+  'image/svg+xml': 'static',
+  'image/svg': 'static',
   default: 'static',
   // 'css': 'css',
   // 'javascript': 'js',
@@ -73,9 +92,149 @@ export function getArtifactFilename(type: string, language?: string): string {
   return artifactFilename[key] ?? artifactFilename.default;
 }
 
+/** Extract visible heading text without removing literal Markdown punctuation. */
+function headingText(nodes: PhrasingContent[]): string {
+  return nodes
+    .map((node) => {
+      if ('children' in node) {
+        return headingText(node.children);
+      }
+      if (node.type === 'text' || node.type === 'inlineCode') {
+        return node.value;
+      }
+      if (node.type === 'image' || node.type === 'imageReference') {
+        return node.alt ?? '';
+      }
+      return '';
+    })
+    .join('');
+}
+
+/** Name for bytes fetched from the original attachment, rather than its cached preview. */
+export function getOriginalArtifactFilename(artifact: Artifact, fileKey: string): string {
+  if (artifact.download?.filename) {
+    return artifact.download.filename;
+  }
+  if (artifact.download?.filename === undefined) {
+    return artifact.title || fileKey;
+  }
+  const extension = getDocumentFileExtension(artifact.download.mimeType);
+  if (extension) {
+    return `content${extension}`;
+  }
+  if (isPreviewOnlyArtifact(artifact.type) || artifact.type === TOOL_ARTIFACT_TYPES.PLAIN_TEXT) {
+    return 'content.bin';
+  }
+  return getArtifactDownloadFilename(
+    { ...artifact, title: undefined, download: undefined },
+    fileKey,
+    '',
+  );
+}
+
+/** Names the downloaded bytes independently of the Sandpack preview file. */
+export function getArtifactDownloadFilename(
+  artifact: Artifact,
+  fileKey: string,
+  content = artifact.content,
+): string {
+  const isCode = artifact.type === TOOL_ARTIFACT_TYPES.CODE;
+  const isMarkdown = artifact.type === TOOL_ARTIFACT_TYPES.MARKDOWN || artifact.type === 'text/md';
+  let fallback = fileKey;
+  if (isCode) {
+    fallback = getCodeBlockFilename(
+      artifact.language || lookupOwn(CODE_EXTENSION_TO_LANGUAGE, extensionOf(artifact.title)),
+    );
+  } else if (artifact.type === TOOL_ARTIFACT_TYPES.PLAIN_TEXT) {
+    fallback = 'content.txt';
+  }
+  let title = (artifact.download?.filename ?? artifact.title)?.trim() ?? '';
+  const hasOriginalName = artifact.download != null && artifact.download.filename !== null;
+  if (!hasOriginalName && (title === 'Generated artifact' || title === 'untitled')) {
+    title = '';
+  }
+  const hasSourceFilename =
+    hasOriginalName &&
+    title !== '' &&
+    artifact.type !== TOOL_ARTIFACT_TYPES.PLAIN_TEXT &&
+    !isPreviewOnlyArtifact(artifact.type);
+  if (!title && isMarkdown) {
+    const markdown = (content ?? '').replace(
+      /^\uFEFF?---[^\S\r\n]*\r?\n[\s\S]*?\r?\n(?:---|\.\.\.)[^\S\r\n]*(?:\r?\n|$)/,
+      '',
+    );
+    const heading = fromMarkdown(markdown, {
+      extensions: [gfm()],
+      mdastExtensions: [gfmFromMarkdown()],
+    }).children.find((node) => node.type === 'heading');
+    if (heading?.type === 'heading') {
+      title = headingText(heading.children).trim();
+    }
+  }
+  const extension = fallback.slice(fallback.lastIndexOf('.'));
+  const hasMatchingExtension = title.toLowerCase().endsWith(extension);
+  let filename = fallback;
+  if (title) {
+    filename = hasSourceFilename || hasMatchingExtension ? title : `${title}${extension}`;
+  }
+  filename = filenamify(filename, { replacement: '_' });
+  /* A file-backed artifact's blob is the cached extraction (or an edit of
+   * it), never the stored file: `extractUtf8` truncates past 512 KB, so
+   * handing these bytes over under the original name would claim to be
+   * the file. Mermaid is no exception — a share that dropped the download
+   * route leaves only that same cached text. */
+  if (artifact.download) {
+    const dot = filename.lastIndexOf('.');
+    filename =
+      dot > 0 ? `${filename.slice(0, dot)}.preview${filename.slice(dot)}` : `${filename}.preview`;
+  }
+  return filename;
+}
+
 export function getTemplate(type: string, language?: string): SandpackPredefinedTemplate {
   const key = getKey(type, language);
   return artifactTemplate[key] ?? (artifactTemplate.default as SandpackPredefinedTemplate);
+}
+
+/** `image/svg` is the alias some callers emit for `image/svg+xml`. */
+export function isSvgArtifactType(type: string): boolean {
+  return type === 'image/svg+xml' || type === 'image/svg';
+}
+
+/**
+ * Files for an `image/svg+xml` (or `image/svg`) artifact. The Sandpack
+ * `static` template always loads `index.html`; a bare SVG in that slot
+ * renders blank. Keep the source on `index.svg` for the code tab and wrap
+ * a copy in a full-viewport HTML shell for the preview. viewBox-only
+ * sources fill the panel via `body > svg { width/height: 100% }`, scoped to
+ * the root because CSS beats presentation attributes: an unscoped `svg` rule
+ * would stretch a nested `<svg>` viewport, such as a sprite or inset diagram,
+ * over its own `width`/`height` and corrupt the artifact's internal layout.
+ *
+ * The shell holds a *copy* of the source, so an edit cannot be applied by
+ * replacing `index.svg` alone — both entries have to be rebuilt from the
+ * new text. `useArtifactProps` exposes this builder as `deriveFiles` for
+ * exactly that.
+ */
+export function getSvgFiles(content: string): Record<string, string> {
+  const svg = content.replace(/^\uFEFF?\s*<\?xml\b[^?]*\?>\s*/i, '');
+  return {
+    'index.svg': content,
+    'index.html': `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+html,body{margin:0;height:100%;overflow:hidden}
+body>svg{display:block;width:100%;height:100%}
+</style>
+</head>
+<body>
+${svg}
+</body>
+</html>`,
+  };
 }
 
 const standardDependencies = {
@@ -154,6 +313,9 @@ const dependenciesMap: Record<
   'application/vnd.librechat.docx-preview': {},
   'application/vnd.librechat.spreadsheet-preview': {},
   'application/vnd.librechat.presentation-preview': {},
+  /* SVG preview is a static HTML shell + the source file; no npm deps. */
+  'image/svg+xml': {},
+  'image/svg': {},
   default: standardDependencies,
 };
 
@@ -211,7 +373,7 @@ const basenameOf = (filename: string): string => {
 
 /**
  * Internal: derive the lowercased extension from a pre-computed basename.
- * Returns `''` for hidden-files (`.env` тЖТ `env` in legacy code, but we
+ * Returns `''` for hidden-files (`.env` → `env` in legacy code, but we
  * deliberately preserve that for backwards compatibility with the
  * extension-list lookup; the bare-name fallback handles the
  * extensionless case separately). The shared variant lets
@@ -239,7 +401,7 @@ const bareNameFromBasename = (base: string): string => {
 };
 
 /**
- * Restrict the dot search to the basename тАФ `pkg.v1/Dockerfile` should
+ * Restrict the dot search to the basename — `pkg.v1/Dockerfile` should
  * yield `''` (extensionless), not `v1/dockerfile`. Otherwise
  * `languageForFilename` returns the path-laden string as the language
  * hint and `marked` emits a `language-v1/dockerfile` class (broken).
@@ -274,25 +436,25 @@ const baseMime = (mime: string | undefined): string => {
 /**
  * Artifact MIME types we currently know how to render in the side panel
  * (or, for mermaid, inline). Plain text covers files we can show as raw
- * content even without a dedicated viewer (txt, docx-extracted text, тАж);
+ * content even without a dedicated viewer (txt, docx-extracted text, …);
  * `useArtifactProps` routes `text/plain` through the markdown template
  * so the panel renders them cleanly. `CODE` is the same idea for source
- * files тАФ `useArtifactProps` wraps the content in a fenced code block
+ * files — `useArtifactProps` wraps the content in a fenced code block
  * with a language hint before handing it to the markdown viewer.
  */
 export const TOOL_ARTIFACT_TYPES = {
   HTML: 'text/html',
   REACT: 'application/vnd.react',
   MARKDOWN: 'text/markdown',
-  MERMAID: 'application/vnd.mermaid',
+  MERMAID: MERMAID_ARTIFACT_TYPE,
   PLAIN_TEXT: 'text/plain',
   CODE: 'application/vnd.code',
   /* Office-format rich previews. The backend renders the binary file as a
    * complete sanitized HTML document and ships it via `attachment.text`;
    * the client routes these types through the Sandpack `static` template's
    * `index.html` slot. The values are synthetic LibreChat-internal MIMEs
-   * тАФ they don't appear on disk or in HTTP headers, only on the artifact
-   * object тАФ so they can't collide with the canonical office MIMEs that
+   * — they don't appear on disk or in HTTP headers, only on the artifact
+   * object — so they can't collide with the canonical office MIMEs that
    * the routing maps key off of. */
   DOCX: 'application/vnd.librechat.docx-preview',
   SPREADSHEET: 'application/vnd.librechat.spreadsheet-preview',
@@ -311,7 +473,7 @@ const lookupOwn = <T>(record: Record<string, T>, key: string): T | undefined =>
   Object.prototype.hasOwnProperty.call(record, key) ? record[key] : undefined;
 
 /**
- * Artifact types whose preview is server-rendered HTML тАФ there's no
+ * Artifact types whose preview is server-rendered HTML — there's no
  * source for a "code" view because the underlying file is binary, and
  * showing the generated HTML blob in a code editor would just be
  * noise. Used by the artifacts panel to hide the code tab and snap
@@ -343,7 +505,169 @@ export function isCodeOnlyArtifact(type: string | null | undefined): boolean {
 }
 
 /**
- * Extension тЖТ fenced-code-block language hint for the CODE bucket. The
+ * Glyph buckets an artifact row falls back to when the file type has no
+ * brand icon in `LANG_ICON_PATHS` (React, the office previews, mermaid,
+ * and every code language without a logo).
+ */
+export type ArtifactGlyph =
+  | 'preview'
+  | 'code'
+  | 'text'
+  | 'diagram'
+  | 'document'
+  | 'spreadsheet'
+  | 'presentation';
+
+/**
+ * How a chat row presents one artifact.
+ *
+ * `rendersPreview` is the distinction the row exists to carry: an HTML,
+ * React, markdown or office artifact opens as something to *look at*,
+ * while a `.py` or `.sql` artifact opens as source to *read*. The panel
+ * already knows the difference (`isCodeOnlyArtifact` hides its preview
+ * tab); before this, the chat trigger showed both as the same `<>` chip.
+ */
+export interface ArtifactRowKind {
+  /** `LangIcon` hint; `''` when no brand glyph applies. */
+  lang: string;
+  /**
+   * Format name shown beside the title. A translation key for named
+   * formats; a raw language identifier (`python`, `hcl`) for the CODE
+   * bucket, which follows `CodeWindowHeader` in printing the hint
+   * verbatim rather than inventing a localized name per language.
+   */
+  label: { key: ArtifactFormatKey } | { text: string };
+  /** Opening this artifact yields a rendered view, not source. */
+  rendersPreview: boolean;
+  fallbackGlyph: ArtifactGlyph;
+}
+
+type ArtifactFormatKey = Extract<
+  TranslationKeys,
+  | 'com_ui_artifact_format_html'
+  | 'com_ui_artifact_format_react'
+  | 'com_ui_artifact_format_markdown'
+  | 'com_ui_artifact_format_text'
+  | 'com_ui_artifact_format_diagram'
+  | 'com_ui_artifact_format_document'
+  | 'com_ui_artifact_format_spreadsheet'
+  | 'com_ui_artifact_format_presentation'
+  | 'com_ui_code'
+  | 'com_ui_preview'
+>;
+
+/**
+ * Legacy and model-authored spellings of the canonical buckets. The
+ * markdown `:::artifact` path takes its type straight from the authored
+ * attribute, so these arrive alongside the values in
+ * `TOOL_ARTIFACT_TYPES`; `artifactTemplate` carries the same aliases.
+ */
+const ARTIFACT_TYPE_ALIASES: Record<string, string> = {
+  'application/vnd.ant.react': TOOL_ARTIFACT_TYPES.REACT,
+  'application/vnd.code-html': TOOL_ARTIFACT_TYPES.HTML,
+  'text/md': TOOL_ARTIFACT_TYPES.MARKDOWN,
+};
+
+const ARTIFACT_ROW_KINDS: Record<string, ArtifactRowKind> = {
+  [TOOL_ARTIFACT_TYPES.HTML]: {
+    lang: 'html',
+    label: { key: 'com_ui_artifact_format_html' },
+    rendersPreview: true,
+    fallbackGlyph: 'preview',
+  },
+  [TOOL_ARTIFACT_TYPES.REACT]: {
+    lang: '',
+    label: { key: 'com_ui_artifact_format_react' },
+    rendersPreview: true,
+    fallbackGlyph: 'preview',
+  },
+  [TOOL_ARTIFACT_TYPES.MARKDOWN]: {
+    lang: 'markdown',
+    label: { key: 'com_ui_artifact_format_markdown' },
+    rendersPreview: true,
+    fallbackGlyph: 'text',
+  },
+  [TOOL_ARTIFACT_TYPES.MERMAID]: {
+    lang: '',
+    label: { key: 'com_ui_artifact_format_diagram' },
+    rendersPreview: true,
+    fallbackGlyph: 'diagram',
+  },
+  [TOOL_ARTIFACT_TYPES.DOCX]: {
+    lang: '',
+    label: { key: 'com_ui_artifact_format_document' },
+    rendersPreview: true,
+    fallbackGlyph: 'document',
+  },
+  [TOOL_ARTIFACT_TYPES.SPREADSHEET]: {
+    lang: '',
+    label: { key: 'com_ui_artifact_format_spreadsheet' },
+    rendersPreview: true,
+    fallbackGlyph: 'spreadsheet',
+  },
+  [TOOL_ARTIFACT_TYPES.PRESENTATION]: {
+    lang: '',
+    label: { key: 'com_ui_artifact_format_presentation' },
+    rendersPreview: true,
+    fallbackGlyph: 'presentation',
+  },
+  [TOOL_ARTIFACT_TYPES.PLAIN_TEXT]: {
+    lang: '',
+    label: { key: 'com_ui_artifact_format_text' },
+    /* `useArtifactProps` routes plain text through `getMarkdownFiles` and
+     * `isCodeOnlyArtifact` covers only CODE, so the panel opens a `.txt`
+     * on its rendered preview tab — the row must say so. */
+    rendersPreview: true,
+    fallbackGlyph: 'text',
+  },
+};
+
+/**
+ * Resolve the glyph, format name and preview/source split for one
+ * artifact row. Takes the fields rather than the whole `Artifact` so
+ * both the file-backed path (where `title` is the on-disk filename) and
+ * the markdown path (where it is authored prose) can call it.
+ */
+export function artifactRowKind({
+  type,
+  language,
+  title,
+}: {
+  type?: string | null;
+  language?: string | null;
+  title?: string | null;
+}): ArtifactRowKind {
+  const resolvedType = (type != null && lookupOwn(ARTIFACT_TYPE_ALIASES, type)) || type;
+  if (resolvedType != null) {
+    const known = lookupOwn(ARTIFACT_ROW_KINDS, resolvedType);
+    if (known != null) {
+      return known;
+    }
+  }
+  /* `language` is written at construction for the CODE bucket, but the
+   * markdown path never sets it, so fall back to the title the way the
+   * panel's fence hint does. */
+  const lang = language || languageForFilename(title ?? undefined);
+  if (resolvedType === TOOL_ARTIFACT_TYPES.CODE) {
+    return {
+      lang,
+      label: lang ? { text: lang } : { key: 'com_ui_code' },
+      rendersPreview: false,
+      fallbackGlyph: 'code',
+    };
+  }
+  /* Unknown types ride `artifactTemplate.default` — a `static` Sandpack
+   * template — so the panel renders them. */
+  return {
+    lang,
+    label: lang ? { text: lang } : { key: 'com_ui_preview' },
+    rendersPreview: true,
+    fallbackGlyph: 'preview',
+  };
+}
+
+/**
+ * Extension → fenced-code-block language hint for the CODE bucket. The
  * key is the lowercased file extension (no dot); the value is the
  * identifier `marked` reads off the fence (e.g. ```` ```python ```` ).
  * The map drives BOTH the `EXTENSION_TO_TOOL_ARTIFACT_TYPE` routing
@@ -357,7 +681,7 @@ export function isCodeOnlyArtifact(type: string | null | undefined): boolean {
  * Scope: programming languages + stylesheets + shell/SQL/build files.
  * Pure data formats (CSV/TSV/JSON/YAML/TOML/XML) and config files
  * (`.env`/`.ini`/`.conf`) are intentionally NOT routed to CODE in this
- * pass тАФ they're better served by dedicated viewers (CSV table view,
+ * pass — they're better served by dedicated viewers (CSV table view,
  * etc.) or remain inline. Adding them later is a one-entry change.
  */
 const CODE_EXTENSION_TO_LANGUAGE: Record<string, string> = {
@@ -434,8 +758,8 @@ const CODE_EXTENSION_TO_LANGUAGE: Record<string, string> = {
 };
 
 /**
- * MIME тЖТ fenced-block language hint. Used as a fallback for files whose
- * filename has no extension AND no recognized bare name тАФ without this,
+ * MIME → fenced-block language hint. Used as a fallback for files whose
+ * filename has no extension AND no recognized bare name — without this,
  * an attachment like `{ filename: 'noext', type: 'text/x-python' }`
  * would route to CODE (via the MIME bucket map above) but render with
  * an empty `language-` class, losing the syntax-hint metadata the
@@ -477,7 +801,7 @@ const MIME_TO_LANGUAGE: Record<string, string> = {
  * extensionless build files, and the MIME type. Falls back to the raw
  * extension if not in the map (so a `.foo` source still gets
  * ```` ```foo ```` and renders monospace, even without highlighting).
- * Empty string when no signal yields a hint тАФ the fence emits as
+ * Empty string when no signal yields a hint — the fence emits as
  * ```` ``` ```` with no language token.
  *
  * The MIME fallback covers the case where codeapi reports a code file
@@ -494,8 +818,8 @@ export function languageForFilename(
   if (ext) {
     return lookupOwn(CODE_EXTENSION_TO_LANGUAGE, ext) ?? ext;
   }
-  /* Extensionless filename: try the basename. `Dockerfile` тЖТ
-   * `dockerfile` тЖТ `'dockerfile'` language hint. */
+  /* Extensionless filename: try the basename. `Dockerfile` →
+   * `dockerfile` → `'dockerfile'` language hint. */
   const bare = bareNameOf(filename);
   const bareLanguage = lookupOwn(CODE_EXTENSION_TO_LANGUAGE, bare);
   if (bareLanguage != null) {
@@ -515,18 +839,18 @@ export function languageForFilename(
 /**
  * Find the longest run of backticks that could close a fenced code block
  * inside `source`. CommonMark allows the closer to be indented up to 3
- * spaces, so runs at columns 0тАУ3 all qualify. The fence emitted by
+ * spaces, so runs at columns 0–3 all qualify. The fence emitted by
  * `wrapAsFencedCodeBlock` must have STRICTLY MORE backticks than any
- * such run inside the payload тАФ otherwise a markdown snippet inside a
+ * such run inside the payload — otherwise a markdown snippet inside a
  * JS template literal (or any source containing ` ``` ` near
  * column 0) closes the outer fence early and the rest renders as
  * markdown, corrupting the artifact.
  */
 export function longestLeadingBacktickRun(source: string): number {
   let max = 0;
-  /* `^ {0,3}(`+)` matches lines whose leading whitespace is тЙд 3
+  /* `^ {0,3}(`+)` matches lines whose leading whitespace is ≤ 3
    * spaces (per CommonMark's fence-indent allowance) followed by one
-   * or more backticks. Tabs are not allowed тАФ CommonMark expands them
+   * or more backticks. Tabs are not allowed — CommonMark expands them
    * to 4 spaces, which is over the closer limit. The multiline + global
    * flags scan every line in the payload. */
   const re = /^ {0,3}(`+)/gm;
@@ -538,8 +862,8 @@ export function longestLeadingBacktickRun(source: string): number {
 
 /**
  * Wrap raw source as a fenced markdown code block so the CODE bucket
- * can ride the existing markdown rendering pipeline тАФ `marked` emits
- * `<pre><code class="language-<lang>">тАж</code></pre>` and the future
+ * can ride the existing markdown rendering pipeline — `marked` emits
+ * `<pre><code class="language-<lang>">…</code></pre>` and the future
  * highlighter swap-in (currently the markdown template uses plain
  * `marked` with no syntax colors) will pick up `language-<lang>`
  * automatically. Pure; deterministic; safe on empty input (renders an
@@ -549,7 +873,7 @@ export function longestLeadingBacktickRun(source: string): number {
  * (longest-leading-run-in-source + 1) when the source contains
  * ` ``` ` (or longer) near the start of any line. This is the
  * CommonMark-spec way to embed a fenced block inside another fenced
- * block тАФ see e.g. the markdown spec's nested-fence examples тАФ and
+ * block — see e.g. the markdown spec's nested-fence examples — and
  * avoids the early-close attack on artifacts whose source is itself
  * markdown-shaped.
  */
@@ -566,7 +890,7 @@ export function wrapAsFencedCodeBlock(source: string, lang: string): string {
 const EXTENSION_TO_TOOL_ARTIFACT_TYPE: Record<string, ToolArtifactType> = {
   html: TOOL_ARTIFACT_TYPES.HTML,
   htm: TOOL_ARTIFACT_TYPES.HTML,
-  // jsx/tsx are React component sources тАФ keep them on the React
+  // jsx/tsx are React component sources — keep them on the React
   // (sandpack) bucket rather than the new CODE bucket so the existing
   // live-preview behavior survives. Plain JS/TS source goes through CODE.
   jsx: TOOL_ARTIFACT_TYPES.REACT,
@@ -577,7 +901,7 @@ const EXTENSION_TO_TOOL_ARTIFACT_TYPE: Record<string, ToolArtifactType> = {
   mmd: TOOL_ARTIFACT_TYPES.MERMAID,
   mermaid: TOOL_ARTIFACT_TYPES.MERMAID,
   txt: TOOL_ARTIFACT_TYPES.PLAIN_TEXT,
-  // ODT has no rich HTML producer тАФ it stays on the markdown-text path.
+  // ODT has no rich HTML producer — it stays on the markdown-text path.
   odt: TOOL_ARTIFACT_TYPES.PLAIN_TEXT,
   /* Office formats with rich HTML previews. The backend's
    * `extractCodeArtifactText` path produces a complete sanitized HTML
@@ -589,16 +913,17 @@ const EXTENSION_TO_TOOL_ARTIFACT_TYPE: Record<string, ToolArtifactType> = {
   xls: TOOL_ARTIFACT_TYPES.SPREADSHEET,
   ods: TOOL_ARTIFACT_TYPES.SPREADSHEET,
   pptx: TOOL_ARTIFACT_TYPES.PRESENTATION,
+  potx: TOOL_ARTIFACT_TYPES.PRESENTATION,
 };
 
 /* Append every entry in `CODE_EXTENSION_TO_LANGUAGE` to the routing map
  * pointing at the CODE bucket. Keeping the language map as the source
  * of truth means a new language is one entry away from being routable.
  *
- * Skip extensions already claimed by a non-CODE bucket тАФ `jsx`/`tsx`
+ * Skip extensions already claimed by a non-CODE bucket — `jsx`/`tsx`
  * belong to React (sandpack) for the live-preview, and a future
  * contributor adding them to `CODE_EXTENSION_TO_LANGUAGE` (a natural
- * mistake тАФ they ARE source code) shouldn't silently break the React
+ * mistake — they ARE source code) shouldn't silently break the React
  * routing path. The explicit map entries above always win. */
 for (const ext of Object.keys(CODE_EXTENSION_TO_LANGUAGE)) {
   if (lookupOwn(EXTENSION_TO_TOOL_ARTIFACT_TYPE, ext) != null) continue;
@@ -613,11 +938,11 @@ const MIME_TO_TOOL_ARTIFACT_TYPE: Record<string, ToolArtifactType> = {
   'application/vnd.react': TOOL_ARTIFACT_TYPES.REACT,
   'application/vnd.ant.react': TOOL_ARTIFACT_TYPES.REACT,
   'application/vnd.mermaid': TOOL_ARTIFACT_TYPES.MERMAID,
-  // Code MIME types тАФ codeapi serves these via Content-Type for source
+  // Code MIME types — codeapi serves these via Content-Type for source
   // files (`text/x-python`, `text/x-typescript`, etc.) so a file whose
   // extension was stripped or renamed upstream still routes to CODE.
   // This is a best-effort COMMON-CASE list, not an exhaustive mirror of
-  // `CODE_EXTENSION_TO_LANGUAGE` тАФ extension-based routing is the
+  // `CODE_EXTENSION_TO_LANGUAGE` — extension-based routing is the
   // primary path, and the MIME table only matters when the filename is
   // missing/extensionless AND the upstream supplied a useful MIME.
   // Adding more here is harmless; missing entries fall through to inline
@@ -644,7 +969,7 @@ const MIME_TO_TOOL_ARTIFACT_TYPE: Record<string, ToolArtifactType> = {
   'text/x-lua': TOOL_ARTIFACT_TYPES.CODE,
   'text/x-swift': TOOL_ARTIFACT_TYPES.CODE,
   'text/css': TOOL_ARTIFACT_TYPES.CODE,
-  // Office MIME types тАФ route to the rich HTML preview buckets when the
+  // Office MIME types — route to the rich HTML preview buckets when the
   // canonical MIME is present. ODT remains on the plain-text path (no
   // dedicated HTML producer). These complement the extension map for
   // extensionless filenames.
@@ -657,7 +982,7 @@ const MIME_TO_TOOL_ARTIFACT_TYPE: Record<string, ToolArtifactType> = {
   'application/vnd.oasis.opendocument.spreadsheet': TOOL_ARTIFACT_TYPES.SPREADSHEET,
   'text/csv': TOOL_ARTIFACT_TYPES.SPREADSHEET,
   'application/csv': TOOL_ARTIFACT_TYPES.SPREADSHEET,
-  /* `text/comma-separated-values` is a legacy CSV MIME variant тАФ rare
+  /* `text/comma-separated-values` is a legacy CSV MIME variant — rare
    * in modern HTTP traffic but still emitted by some sandboxes. Kept
    * in lock-step with the backend's `CSV_MIME_PATTERN` in
    * `packages/api/src/files/documents/html.ts` so an extensionless CSV
@@ -665,6 +990,8 @@ const MIME_TO_TOOL_ARTIFACT_TYPE: Record<string, ToolArtifactType> = {
    * backend has already produced full HTML for it. */
   'text/comma-separated-values': TOOL_ARTIFACT_TYPES.SPREADSHEET,
   'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+    TOOL_ARTIFACT_TYPES.PRESENTATION,
+  'application/vnd.openxmlformats-officedocument.presentationml.template':
     TOOL_ARTIFACT_TYPES.PRESENTATION,
   // Note: bare `text/plain` is NOT mapped here. The extension map handles
   // `.txt` explicitly; routing every unrecognized-extension `text/plain`
@@ -680,7 +1007,7 @@ const MIME_TO_TOOL_ARTIFACT_TYPE: Record<string, ToolArtifactType> = {
  *
  * Empty `text` is tolerated for the plain-text and markdown buckets so a
  * file whose extraction is still TBD (e.g. pptx, or a docx where the
- * extractor errored) keeps visual parity with its docx/odt siblings тАФ the
+ * extractor errored) keeps visual parity with its docx/odt siblings — the
  * card still routes through the panel and `fileToArtifact` substitutes a
  * placeholder so the panel renders something sensible. The HTML, React,
  * and Mermaid buckets still require real content because their viewers
@@ -691,7 +1018,7 @@ const MIME_TO_TOOL_ARTIFACT_TYPE: Record<string, ToolArtifactType> = {
  * before the client will inject `attachment.text` as `index.html`.
  * Routing to these buckets without the trust flag would let plain
  * text from RAG-uploaded `.docx` etc. (mammoth.extractRawText output)
- * be rendered as HTML тАФ Codex P1 review on PR #12934.
+ * be rendered as HTML — Codex P1 review on PR #12934.
  */
 const OFFICE_HTML_BUCKETS: ReadonlySet<ToolArtifactType> = new Set([
   TOOL_ARTIFACT_TYPES.DOCX,
@@ -735,13 +1062,13 @@ export function detectArtifactTypeFromFile(
    * the iframe via `index.html`. Plain text from a RAG-extracted
    * .docx (mammoth output) would become executable markup here.
    * Require the backend's explicit `textFormat: 'html'` trust signal
-   * before allowing this routing тАФ fall back to PLAIN_TEXT (markdown
+   * before allowing this routing — fall back to PLAIN_TEXT (markdown
    * viewer, escapes content) for everything else.
    *
    * Legacy attachments stored before this field existed have
    * `textFormat === undefined`; they may have HTML in `text` from the
    * pre-flag period and the safe default ('text' bucket) is OK for
-   * those тАФ they were rendering correctly before this flag, and the
+   * those — they were rendering correctly before this flag, and the
    * markdown viewer escaping HTML is a safety upgrade, not a
    * regression. Codex P1 review on PR #12934.
    *
@@ -765,7 +1092,7 @@ export function detectArtifactTypeFromFile(
     type !== TOOL_ARTIFACT_TYPES.CODE
   ) {
     /* HTML, REACT, MERMAID, and the office preview buckets all require
-     * real content тАФ their renderers (sandpack iframes / mermaid.js /
+     * real content — their renderers (sandpack iframes / mermaid.js /
      * the office HTML pipeline) error or render blank without it. The
      * artifact stays unregistered until the backend produces text;
      * `ToolArtifactCard`'s self-heal effect re-fires on drift so the
@@ -779,7 +1106,7 @@ export function detectArtifactTypeFromFile(
  * Stable per-file key used for both the artifactsState entry and the
  * `toolArtifactClaim` atom that dedups duplicate cards. Same call shape
  * everywhere so a panel card and a mermaid card for the same file share
- * the same claim. Falls through `file_id` тЖТ `filename` тЖТ `filepath` to
+ * the same claim. Falls through `file_id` → `filename` → `filepath` to
  * minimise collision risk for any caller that (rarely) lacks `file_id`.
  */
 export const toolArtifactKey = (
@@ -842,6 +1169,8 @@ export function fileToArtifact(
         | 'textFormat'
         | 'updatedAt'
         | 'createdAt'
+        | 'source'
+        | 'user'
       >
   >,
   options?: FileToArtifactOptions,
@@ -854,7 +1183,7 @@ export function fileToArtifact(
   // caller that supplies `preClassifiedType` (and thus skips that gate)
   // can't accidentally hand HTML/React/Mermaid an empty buffer that
   // their viewers would error on. Plain-text and markdown are still
-  // tolerated empty тАФ the markdown viewer renders empty cleanly.
+  // tolerated empty — the markdown viewer renders empty cleanly.
   if (
     !attachment.text &&
     type !== TOOL_ARTIFACT_TYPES.PLAIN_TEXT &&
@@ -862,7 +1191,7 @@ export function fileToArtifact(
     type !== TOOL_ARTIFACT_TYPES.CODE
   ) {
     /* HTML, REACT, MERMAID, and the office preview buckets all require
-     * real content тАФ their renderers (sandpack iframes / mermaid.js /
+     * real content — their renderers (sandpack iframes / mermaid.js /
      * the office HTML pipeline) error or render blank without it. The
      * artifact stays unregistered until the backend produces text;
      * `ToolArtifactCard`'s self-heal effect re-fires on drift so the
@@ -885,7 +1214,7 @@ export function fileToArtifact(
     id: toolArtifactKey(attachment),
     type,
     title: attachment.filename ?? 'Generated artifact',
-    // Nullish coalesce тАФ an empty string is a legitimate file (e.g. a
+    // Nullish coalesce — an empty string is a legitimate file (e.g. a
     // user wrote an empty `.md`) and should render as empty in the
     // panel rather than be replaced by the deferred-extraction
     // placeholder. Only `null`/`undefined` fall through to the
@@ -894,6 +1223,20 @@ export function fileToArtifact(
     language,
     messageId: attachment.messageId ?? undefined,
     lastUpdateTime: toLastUpdate(attachment),
+    /* Preserve the original-file download coordinates so the panel's
+     * download button can fetch the real file (matching the inline
+     * card's `useAttachmentLink` path). Critical for office buckets
+     * whose `content` is a server-rendered HTML preview, not the
+     * binary — serializing `content` would hand the user the preview
+     * instead of the .pptx/.xlsx/.docx. */
+    download: {
+      filename: attachment.filename || null,
+      mimeType: attachment.type,
+      filepath: attachment.filepath,
+      file_id: attachment.file_id,
+      source: attachment.source,
+      user: attachment.user,
+    },
   };
 }
 

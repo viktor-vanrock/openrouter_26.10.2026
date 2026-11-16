@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
+import { Constants, dataService } from 'librechat-data-provider';
 import { RecoilRoot, useRecoilCallback, useRecoilValue } from 'recoil';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Constants, dataService } from 'librechat-data-provider';
 import useSubmitMessage from './useSubmitMessage';
 import store from '~/store';
 
@@ -39,7 +39,7 @@ jest.mock('~/hooks/Prototype/usePrototypeAvailability', () => ({
 jest.mock('react-router-dom', () => ({ useNavigate: () => mockNavigate }));
 jest.mock('@librechat/client', () => ({ useToastContext: () => ({ showToast: mockToast }) }));
 jest.mock('~/hooks/AuthContext', () => ({ useAuthContext: () => ({ user: {} }) }));
-jest.mock('./useLatestMessage', () => ({ useLatestMessage: () => null }));
+jest.mock('./useLatestMessage', () => ({ useGetLatestMessage: () => () => null }));
 jest.mock('~/Providers', () => ({
   useAddedChatContext: () => ({ conversation: null }),
   useChatContext: () => ({
@@ -111,7 +111,9 @@ it('requests one direct image turn and leaves the next ordinary turn unmarked', 
 it('generates images without the developing cookie', async () => {
   mockMode = false;
   const { result } = renderHook(() => useSubmitMessage(), { wrapper });
-  await act(async () => { await result.current.submitImage({ text: 'Кот' }); });
+  await act(async () => {
+    await result.current.submitImage({ text: 'Кот' });
+  });
   expect(mockAsk).toHaveBeenCalledWith({ text: 'Кот' }, { directImage: true });
   expect(mockReset).toHaveBeenCalledTimes(1);
 });
@@ -121,7 +123,10 @@ it('ignores a second image click before the first submission completes', async (
   mockMode = false;
   const { result } = renderHook(() => useSubmitMessage(), { wrapper });
   await act(async () => {
-    await Promise.all([result.current.submitImage({ text: 'Кот' }), result.current.submitImage({ text: 'Кот' })]);
+    await Promise.all([
+      result.current.submitImage({ text: 'Кот' }),
+      result.current.submitImage({ text: 'Кот' }),
+    ]);
   });
   expect(mockAsk).toHaveBeenCalledTimes(1);
 });
@@ -168,7 +173,9 @@ it('serializes same-tick submits across two hook instances in the same composer'
   );
   let first!: Promise<void>;
   await act(async () => {
-    first = result.current.first.submitMessage({ text: 'Build a dashboard' });
+    first = Promise.resolve(result.current.first.submitMessage({ text: 'Build a dashboard' })).then(
+      () => undefined,
+    );
     await result.current.second.submitMessage({ text: 'Build a dashboard' });
   });
   expect(result.current.busy).toBe(true);

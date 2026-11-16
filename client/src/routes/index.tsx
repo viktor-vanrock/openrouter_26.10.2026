@@ -9,25 +9,25 @@ import {
   RequestPasswordReset,
 } from '~/components/Auth';
 import { MarketplaceProvider } from '~/components/Agents/MarketplaceContext';
+import { AdminDashboard } from '~/components/Admin/pages/Dashboard';
+import AdminGuides from '~/components/Admin/guides/AdminGuides';
+import GuideViewer from '~/components/Admin/guides/GuideViewer';
 import AgentMarketplace from '~/components/Agents/Marketplace';
+import { hasDevelopingCookie } from '~/utils/developingCookie';
 import { OAuthSuccess, OAuthError } from '~/components/OAuth';
+import { AdminLayout } from '~/components/Admin/AdminLayout';
+import { AdminUsers } from '~/components/Admin/pages/Users';
 import { AuthContextProvider } from '~/hooks/AuthContext';
-import WithRum from '~/lib/rum/WithRum';
 import RouteErrorBoundary from './RouteErrorBoundary';
 import StartupLayout from './Layouts/Startup';
 import LoginLayout from './Layouts/Login';
 import dashboardRoutes from './Dashboard';
+import { AdminRoute } from './AdminRoute';
+import WithRum from '~/lib/rum/WithRum';
 import ShareRoute from './ShareRoute';
 import ChatRoute from './ChatRoute';
 import Search from './Search';
 import Root from './Root';
-import { AdminRoute } from './AdminRoute';
-import { AdminLayout } from '~/components/Admin/AdminLayout';
-import { AdminDashboard } from '~/components/Admin/pages/Dashboard';
-import { AdminUsers } from '~/components/Admin/pages/Users';
-import AdminGuides from '~/components/Admin/guides/AdminGuides';
-import GuideViewer from '~/components/Admin/guides/GuideViewer';
-import { hasDevelopingCookie } from '~/utils/developingCookie';
 
 const AuthLayout = () => (
   <AuthContextProvider>
@@ -61,6 +61,11 @@ const loadAdminReleases = () => {
     Component: m.default,
   }));
 };
+
+const loadInsightsView = () =>
+  import('~/components/Insights').then((m) => ({
+    Component: m.default,
+  }));
 
 const loadProjectsView = () =>
   import('~/components/Projects').then((m) => ({
@@ -177,11 +182,12 @@ export const router = createBrowserRouter(
             },
             {
               path: 'prompts',
-              element: <Navigate to="/prompts/new" replace={true} />,
+              element: <Navigate to="/c/new" replace={true} />,
             },
             {
+              /** Prompts are created from a dialog, so there is no "new" page to land on */
               path: 'prompts/new',
-              lazy: loadInlinePromptsView,
+              element: <Navigate to="/c/new" replace={true} />,
             },
             {
               path: 'prompts/:promptId',
@@ -190,6 +196,10 @@ export const router = createBrowserRouter(
             {
               path: 'skills',
               lazy: loadSkillsView,
+            },
+            {
+              path: 'insights',
+              lazy: loadInsightsView,
             },
             {
               path: 'skills/new',

@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import {
+  useRevokeUserKeyMutation,
+  useRevokeAllUserKeysMutation,
+} from 'librechat-data-provider/react-query';
+import {
   EModelEndpoint,
   EModelEndpointCustom,
   alternateName,
   isAssistantsEndpoint,
 } from 'librechat-data-provider';
-import {
-  useRevokeUserKeyMutation,
-  useRevokeAllUserKeysMutation,
-} from 'librechat-data-provider/react-query';
 import {
   Label,
   Button,
@@ -24,16 +24,17 @@ import {
   OGDialogTrigger,
 } from '@librechat/client';
 import type { TDialogProps } from '~/common';
-import { useUserKey, useLocalize } from '~/hooks';
+import { useUserKey, useLocalize, useClockFormat } from '~/hooks';
 import { NotificationSeverity } from '~/common';
+import { formatKeyExpiryLabel } from './utils';
 import CustomConfig from './CustomEndpoint';
+import BedrockConfig from './BedrockConfig';
+import { useCurrentKey } from '~/Providers';
 import GoogleConfig from './GoogleConfig';
 import OpenAIConfig from './OpenAIConfig';
 import OtherConfig from './OtherConfig';
-import BedrockConfig from './BedrockConfig';
 import HelpText from './HelpText';
 import { logger } from '~/utils';
-import { useCurrentKey } from '~/Providers';
 const endpointComponents = {
   [EModelEndpoint.google]: GoogleConfig,
   [EModelEndpoint.openAI]: OpenAIConfig,
@@ -150,7 +151,7 @@ const RevokeKeysButton = ({
               variant="destructive"
               onClick={onClick}
               disabled={isLoading}
-              className="bg-destructive text-white transition-all duration-200 hover:bg-destructive/80"
+              className="bg-surface-destructive text-text-on-status transition-all duration-200 hover:bg-surface-destructive-hover"
             >
               {isLoading ? <Spinner /> : localize('com_ui_revoke')}
             </Button>
@@ -403,6 +404,13 @@ const SetKeyDialog = ({
 
   const EndpointComponent = endpointComponents[configuredEndpoint] ?? endpointComponents['default'];
   const expiryTime = getExpiry();
+  const hour12 = useClockFormat();
+  let currentExpiryLabel: string | null = null;
+  if (expiryTime === 'never') {
+    currentExpiryLabel = localize('com_endpoint_config_key_never_expires');
+  } else if (expiryTime !== undefined) {
+    currentExpiryLabel = formatKeyExpiryLabel(localize, expiryTime, hour12);
+  }
 
   return (
     <OGDialog open={open} onOpenChange={onOpenChange}>
@@ -421,7 +429,7 @@ const SetKeyDialog = ({
                 ).toLocaleString()}`}
           </small>
           <Dropdown
-            label="Expires "
+            label={`${localize('com_endpoint_config_new_key_expiration')}: `}
             value={expiresAtLabel}
             onChange={handleExpirationChange}
             options={expirationOptions.map((option) => option.label)}

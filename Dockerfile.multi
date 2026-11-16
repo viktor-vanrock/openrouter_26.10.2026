@@ -1,5 +1,5 @@
 # Dockerfile.multi
-# v0.8.7
+# v0.8.8
 
 ARG NODE_MAX_OLD_SPACE_SIZE=4096
 
@@ -14,6 +14,8 @@ ARG NPM_CI_ATTEMPTS=2
 RUN apk upgrade --no-cache
 RUN apk add --no-cache jemalloc
 ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
+# Disable dependency installation analytics before any npm lifecycle scripts run.
+ENV SCARF_ANALYTICS=false
 
 WORKDIR /app
 RUN apk --no-cache add curl
@@ -78,6 +80,7 @@ ARG TARGETARCH
 ARG NPM_CI_TIMEOUT_SECONDS=1500
 ARG NPM_CI_ATTEMPTS=2
 RUN apk add --no-cache python3 py3-pip uv
+RUN mkdir -p /app/data && chmod 1777 /app/data
 RUN uv --version
 WORKDIR /app
 RUN attempt=1; \

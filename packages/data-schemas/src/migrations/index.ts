@@ -1,6 +1,8 @@
-export { dropSupersededTenantIndexes } from './tenantIndexes';
+export { dropSupersededTenantIndexes, migrateTenantIndexes } from './tenantIndexes';
 export { dropSupersededPromptGroupIndexes } from './promptGroupIndexes';
 export { ensurePrototypeIndexes } from './prototypeIndexes';
 export { ensureGuidePageIndexes } from './guidePageIndexes';
 export { ensureGuideMediaIndexes } from './guideMediaIndexes';
 export { ensureReleaseIndexes } from './releaseIndexes';
+export { createMCPAuthorityLookupIndexes } from './mcpAuthorityIndexes';
+export { MCPServerNameMigrationError, backfillMCPServerNormalizedNames } from './mcpServerNames';

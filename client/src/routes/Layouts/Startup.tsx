@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
+import { Spinner } from '@librechat/client';
 import { Outlet, useNavigate, useLocation, useNavigation } from 'react-router-dom';
 import type { TStartupConfig } from 'librechat-data-provider';
+import { REDIRECT_PARAM, hasStoredRedirect } from '~/utils';
 import { TranslationKeys, useLocalize } from '~/hooks';
 import { useGetStartupConfig } from '~/data-provider';
 import AuthLayout from '~/components/Auth/AuthLayout';
-import { REDIRECT_PARAM, SESSION_KEY } from '~/utils';
 import { APP_NAME } from '~/utils/brand';
-import { Spinner } from '@librechat/client';
 
 const headerMap: Record<string, TranslationKeys> = {
   '/login': 'com_auth_welcome_back',
@@ -36,8 +36,7 @@ export default function StartupLayout({ isAuthenticated }: { isAuthenticated?: b
   useEffect(() => {
     if (isAuthenticated) {
       const hasPendingRedirect =
-        new URLSearchParams(window.location.search).has(REDIRECT_PARAM) ||
-        sessionStorage.getItem(SESSION_KEY) != null;
+        new URLSearchParams(window.location.search).has(REDIRECT_PARAM) || hasStoredRedirect();
       if (!hasPendingRedirect) {
         navigate('/c/new', { replace: true });
       }

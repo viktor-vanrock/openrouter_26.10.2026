@@ -1,6 +1,6 @@
 import { Globe } from 'lucide-react';
-import { Spinner, TooltipAnchor } from '@librechat/client';
 import { useWatch, useFormContext } from 'react-hook-form';
+import { Button, Spinner, TooltipAnchor } from '@librechat/client';
 import {
   SystemRoles,
   Permissions,
@@ -62,26 +62,31 @@ export default function AgentFooter({
   const canEditThisAgent = hasPermission(PermissionBits.EDIT);
   const canDeleteThisAgent = hasPermission(PermissionBits.DELETE);
   const canShareRemoteAgent = hasRemoteAgentPermission(PermissionBits.SHARE);
+  const isAdmin = user?.role === SystemRoles.ADMIN;
   const isSaving = createMutation.isLoading || updateMutation.isLoading || isAvatarUploading;
   const isSaveDisabled = isSaving || modelCompatibilityError != null;
-  const renderSaveButton = () => {
-    if (isSaving) {
-      return <Spinner className="icon-md" aria-hidden="true" />;
-    }
-
-    if (agent_id) {
-      return localize('com_ui_save');
-    }
-
-    return localize('com_ui_create');
-  };
+  const saveLabel = agent_id ? localize('com_ui_save') : localize('com_ui_create');
+  const renderSaveButton = () => (
+    <span className="t-icon-swap" data-state={isSaving ? 'b' : 'a'} aria-hidden={false}>
+      <span className="t-icon" data-icon="a">
+        {saveLabel}
+      </span>
+      <span className="t-icon" data-icon="b">
+        <Spinner className="icon-md" aria-hidden="true" />
+      </span>
+    </span>
+  );
 
   const showButtons = activePanel === Panel.builder;
 
   return (
     <div className="mb-1 flex w-full flex-col gap-2">
-      {showButtons && <AdvancedButton setActivePanel={setActivePanel} />}
-      {showButtons && agent_id && <VersionButton setActivePanel={setActivePanel} />}
+      {showButtons && (
+        <div className={`grid gap-2 ${agent_id ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          <AdvancedButton setActivePanel={setActivePanel} />
+          {!!agent_id && <VersionButton setActivePanel={setActivePanel} />}
+        </div>
+      )}
       {user?.role === SystemRoles.ADMIN && showButtons && <AdminSettings />}
       {/* Context Button */}
       <div className="flex items-center justify-end gap-2">
@@ -93,8 +98,8 @@ export default function AgentFooter({
               createMutation={createMutation}
             />
           )}
-        {(agent?.author === user?.id || user?.role === SystemRoles.ADMIN || canShareThisAgent) &&
-          hasAccessToShareAgents &&
+        {(agent?.author === user?.id || isAdmin || canShareThisAgent) &&
+          (hasAccessToShareAgents || isAdmin) &&
           !permissionsLoading && (
             <GenericGrantAccessDialog
               resourceDbId={agent?._id}
@@ -113,13 +118,15 @@ export default function AgentFooter({
               resourceName={agent?.name ?? ''}
               resourceType={ResourceType.REMOTE_AGENT}
             >
-              <button
+              <Button
                 type="button"
-                className="btn btn-neutral border-token-border-light h-9 px-3"
+                variant="outline"
+                aria-label={localize('com_ui_remote_access')}
                 title={localize('com_ui_remote_access')}
+                className="h-9 w-auto px-3"
               >
                 <Globe className="h-4 w-4" aria-hidden="true" />
-              </button>
+              </Button>
             </GenericGrantAccessDialog>
           )}
         {(agent?.author === user?.id || user?.role === SystemRoles.ADMIN || canEditThisAgent) &&

@@ -9,8 +9,8 @@ import {
   EModelEndpoint,
   defaultModels,
 } from 'librechat-data-provider';
-import type { IUser } from '@librechat/data-schemas';
 import type { ModelInfo } from 'librechat-data-provider';
+import type { IUser } from '@librechat/data-schemas';
 import type { AxiosRequestConfig } from 'axios';
 import {
   processModelData,
@@ -99,6 +99,7 @@ async function fetchOllamaModels(
   const resolvedHeaders = resolveHeaders({
     headers: options.headers ?? undefined,
     user: options.user,
+    stripUnresolved: true,
   });
 
   const requestOptions: AxiosRequestConfig & {
@@ -308,6 +309,7 @@ export async function fetchModels({
     const resolvedHeaders = resolveHeaders({
       headers: headers ?? undefined,
       user: userObject,
+      stripUnresolved: true,
     });
 
     const options: AxiosRequestConfig & {

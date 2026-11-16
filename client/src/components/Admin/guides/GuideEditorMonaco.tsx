@@ -1,9 +1,9 @@
-import Editor, { loader, type OnMount } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
+import Editor, { loader, type OnMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
-import 'monaco-editor/esm/vs/basic-languages/html/html.contribution';
-import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import 'monaco-editor/basic-languages/monaco.contribution';
 import { forwardRef, useImperativeHandle, useRef } from 'react';
+import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
 
 const monacoGlobal = self as typeof globalThis & {
   MonacoEnvironment?: { getWorker: (_moduleId: string, label: string) => Worker };

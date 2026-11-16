@@ -1,11 +1,12 @@
 import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
+import { constants } from 'zlib';
 import { defineConfig } from 'vite';
 import { createRequire } from 'module';
 import { VitePWA } from 'vite-plugin-pwa';
-import { compression } from 'vite-plugin-compression2';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import { compression, defineAlgorithm } from 'vite-plugin-compression2';
 import type { Plugin } from 'vite';
 import { readFileSync } from 'fs';
 
@@ -21,12 +22,15 @@ const rootPkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.u
  * the shim specifiers to absolute paths via CJS require.resolve anchored to the client directory.
  */
 const NODE_POLYFILL_SHIMS: Record<string, string> = {
-  'vite-plugin-node-polyfills/shims/process':
-    require.resolve('vite-plugin-node-polyfills/shims/process'),
-  'vite-plugin-node-polyfills/shims/buffer':
-    require.resolve('vite-plugin-node-polyfills/shims/buffer'),
-  'vite-plugin-node-polyfills/shims/global':
-    require.resolve('vite-plugin-node-polyfills/shims/global'),
+  'vite-plugin-node-polyfills/shims/process': require.resolve(
+    'vite-plugin-node-polyfills/shims/process',
+  ),
+  'vite-plugin-node-polyfills/shims/buffer': require.resolve(
+    'vite-plugin-node-polyfills/shims/buffer',
+  ),
+  'vite-plugin-node-polyfills/shims/global': require.resolve(
+    'vite-plugin-node-polyfills/shims/global',
+  ),
 };
 
 const nodePolyfillShimsResolver = (): Plugin => ({
@@ -53,8 +57,11 @@ if (
 }
 
 const backendPort = (process.env.BACKEND_PORT && Number(process.env.BACKEND_PORT)) || 3080;
-const backendURL = process.env.HOST
-  ? `http://${process.env.HOST}:${backendPort}`
+/** IPv6 hosts arrive unbracketed (valid for the listen address) but must be
+ *  bracketed inside a URL, or the proxy target parses as host `:` port soup. */
+const backendHost = process.env.HOST?.includes(':') ? `[${process.env.HOST}]` : process.env.HOST;
+const backendURL = backendHost
+  ? `http://${backendHost}:${backendPort}`
   : `http://localhost:${backendPort}`;
 const buildSourceMap = process.env.NODE_ENV === 'development';
 const QUERY_DEVTOOLS_CHUNK_MODULES = [
@@ -89,7 +96,7 @@ export default defineConfig(({ command }) => ({
   },
   // Set the directory where environment variables are loaded from and restrict prefixes
   envDir: '../',
-  envPrefix: ['VITE_', 'SCRIPT_', 'DOMAIN_', 'ALLOW_'],
+  envPrefix: ['VITE_', 'SCRIPT_', 'DOMAIN_', 'ALLOW_', 'REACT_APP_THEME_'],
   worker: {
     plugins: () => [nodePolyfillShimsResolver()],
   },
@@ -104,10 +111,11 @@ export default defineConfig(({ command }) => ({
         this.emitFile({
           type: 'asset',
           fileName: 'sw-heal.js',
-          source: fs.readFileSync(path.resolve(__dirname, 'sw/heal.js'), 'utf8'),
+          source: fs.readFileSync(path.resolve(import.meta.dirname, 'sw/heal.js'), 'utf8'),
         });
       },
     },
+    copyPublicAssets(),
     VitePWA({
       injectRegister: 'auto', // 'auto' | 'manual' | 'disabled'
       registerType: 'autoUpdate', // 'prompt' | 'autoUpdate'
@@ -122,8 +130,9 @@ export default defineConfig(({ command }) => ({
           'assets/favicon*.png',
           'assets/icon-*.png',
           'assets/apple-touch-icon*.png',
+          /** `manifest.webmanifest` is not listed: vite-plugin-pwa always appends it as an
+           * additional manifest entry, so globbing it too duplicates the precache entry. */
           'assets/maskable-icon.png',
-          'manifest.webmanifest',
         ],
         globIgnores: [
           'images/**/*',
@@ -137,6 +146,14 @@ export default defineConfig(({ command }) => ({
           'assets/code-editor.*.js',
         ],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        /**
+         * vite-plugin-pwa defaults this to `/^assets\//`, which is only true for the
+         * hashed bundle output: the icons live in `assets/` under stable filenames, so the
+         * default marks them immutable (`revision: null`) and an installed PWA would keep
+         * a rebranded icon forever. Match Vite's `[name].[hash].[ext]` shape instead so
+         * hashed chunks stay revision-free while the icons get content revisions.
+         */
+        dontCacheBustURLsMatching: /\.[\w-]{8}\.(?:js|css)$/,
         /** LibreChat mutates index.html per request for subpath and language support. */
         navigateFallback: null,
         /** Reloads window clients that cannot answer a ping after activation —
@@ -202,8 +219,29 @@ export default defineConfig(({ command }) => ({
       // The API serves precompressed gzip with Brotli disabled.
       algorithms: ['gzip'],
       threshold: 10240,
+      /**
+       * Brotli's default quality of 11 costs ~13s of single-threaded CPU on this bundle
+       * against ~0.5s for gzip, and the plugin's scheduler serializes quality >= 10 as a
+       * high-memory operation. Quality 5 compresses in ~0.2s, still lands under gzip
+       * (4.3MB vs 5.0MB), and parallelizes. `.br` is only served when
+       * ENABLE_STATIC_ASSET_BROTLI is set, so the extra 0.5MB buys far less than it costs
+       * on every build of every platform.
+       */
+      algorithms: [
+        defineAlgorithm('gzip', { level: 9 }),
+        defineAlgorithm('brotliCompress', {
+          params: { [constants.BROTLI_PARAM_QUALITY]: 5 },
+        }),
+      ],
     }),
   ],
+  optimizeDeps: {
+    include: [
+      'vite-plugin-node-polyfills/shims/buffer',
+      'vite-plugin-node-polyfills/shims/process',
+      'vite-plugin-node-polyfills/shims/global',
+    ],
+  },
   publicDir: command === 'serve' ? './public' : false,
   build: {
     sourcemap: buildSourceMap,
@@ -272,7 +310,7 @@ export default defineConfig(({ command }) => ({
                   if (normalizedId.includes('react-hook-form')) {
                     return 'forms';
                   }
-                  if (normalizedId.includes('react-router-dom')) {
+                  if (normalizedId.includes('react-router')) {
                     return 'routing';
                   }
                   if (
@@ -424,8 +462,8 @@ export default defineConfig(({ command }) => ({
   },
   resolve: {
     alias: {
-      '~': path.join(__dirname, 'src/'),
-      $fonts: path.resolve(__dirname, 'public/fonts'),
+      '~': path.join(import.meta.dirname, 'src/'),
+      $fonts: path.resolve(import.meta.dirname, 'public/fonts'),
       'micromark-extension-math': 'micromark-extension-llm-math',
     },
   },
@@ -446,6 +484,41 @@ export function sourcemapExclude(opts?: SourcemapExclude): Plugin {
           map: { mappings: '' },
         };
       }
+    },
+  };
+}
+
+/**
+ * Production builds set `publicDir: false`, so nothing under public/ reaches dist on its
+ * own. This copies what the server actually has to serve: all of public/assets (the PWA
+ * icons plus the endpoint, tool and language logos referenced at runtime) and robots.txt.
+ * public/fonts is deliberately left out, since fonts are emitted as bundle assets through
+ * the `$fonts` alias.
+ *
+ * The copy MUST happen inside the build. vite-plugin-pwa globs dist/ for
+ * `workbox.globPatterns` from its `closeBundle` hook, which runs after every plugin's
+ * `writeBundle`, so copying here is what lets the `assets/*.png` icon patterns match. An
+ * `npm run build && node scripts/post-build.cjs` chain cannot: it runs after the service
+ * worker has already been generated, so the icons were silently absent from the precache
+ * manifest.
+ */
+export function copyPublicAssets(): Plugin {
+  const publicDir = path.resolve(import.meta.dirname, 'public');
+  let outDir = path.resolve(import.meta.dirname, 'dist');
+  return {
+    name: 'copy-public-assets',
+    apply: 'build',
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir);
+    },
+    async writeBundle() {
+      await fs.promises.cp(path.join(publicDir, 'assets'), path.join(outDir, 'assets'), {
+        recursive: true,
+      });
+      await fs.promises.copyFile(
+        path.join(publicDir, 'robots.txt'),
+        path.join(outDir, 'robots.txt'),
+      );
     },
   };
 }

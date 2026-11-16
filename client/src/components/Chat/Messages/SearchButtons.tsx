@@ -5,10 +5,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { TMessage, TConversation } from 'librechat-data-provider';
 import type { InfiniteData } from '@tanstack/react-query';
 import type { ConversationCursorData } from '~/utils';
+import { findConversationInInfinite, setDocumentTitle } from '~/utils';
 import { useLocalize, useNavigateToConvo } from '~/hooks';
-import { findConversationInInfinite } from '~/utils';
-import store from '~/store';
 import { APP_NAME } from '~/utils/brand';
+import store from '~/store';
 
 export default function SearchButtons({ message }: { message: TMessage }) {
   const localize = useLocalize();
@@ -39,7 +39,7 @@ export default function SearchButtons({ message }: { message: TMessage }) {
       title = cachedConvo?.title ?? '';
     }
 
-    document.title = APP_NAME;
+    setDocumentTitle(title);
     navigateToConvo(
       cachedConvo ??
         ({

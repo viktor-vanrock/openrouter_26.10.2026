@@ -1,5 +1,4 @@
 import { memo, useEffect, useId, useLayoutEffect, useRef } from 'react';
-import { Download } from 'lucide-react';
 import {
   useRecoilCallback,
   useRecoilState,
@@ -9,12 +8,11 @@ import {
 } from 'recoil';
 import type { TAttachment, TFile, TAttachmentMetadata } from 'librechat-data-provider';
 import type { Artifact } from '~/common';
-import FilePreview from '~/components/Chat/Input/Files/FilePreview';
-import { isCodeOnlyArtifact } from '~/utils/artifacts';
+import { artifactRowKind, isCodeOnlyArtifact } from '~/utils/artifacts';
+import { useMessageContext } from '~/Providers/MessageContext';
 import { displayFilename } from './attachmentTypes';
 import { useAttachmentLink } from './LogLink';
-import { useLocalize } from '~/hooks';
-import { cn, getFileType } from '~/utils';
+import ArtifactRow from './ArtifactRow';
 import store from '~/store';
 
 interface ToolArtifactCardProps {
@@ -42,25 +40,25 @@ interface ToolArtifactCardProps {
  *     entry is missing or the cached content/type/title drifted. The
  *     panel's `useArtifacts` hook resets `artifactsState` on close, so
  *     this re-fires deterministically once the slice transitions back
- *     to `undefined` тАФ without the no-deps render-loop pattern. The
+ *     to `undefined` — without the no-deps render-loop pattern. The
  *     write is also gated on `isMyClaim`, making the registration
  *     single-writer per id: when two cards exist for the same file
  *     across turns, only the latest (claim-holder) updates state.
  *     Without that guard, both cards would observe each other's write
  *     and trade overwrites in a loop.
  *
- *  3. **Focus + open on mount** (deps: artifact.id, artifact.type) тАФ
- *     gated on `isSubmitting` captured at first render via a ref AND
+ *  3. **Focus + open on ownership change** (deps: artifact.id, artifact.type, ownerMessageId) —
+ *     gated on this message's `isSubmitting` captured on mount AND
  *     on `artifact.type !== CODE`. A card mounted *during* streaming
  *     for a rich-preview bucket (HTML, React, Markdown, plain text)
  *     steals panel focus and forces `artifactsVisibility = true` so
- *     the panel auto-opens тАФ matching the legacy SSE auto-open UX.
+ *     the panel auto-opens — matching the legacy SSE auto-open UX.
  *     A card mounted while `isSubmitting === false` is part of
  *     conversation history (page load, back-navigation) and must not
- *     steal focus тАФ `Presentation`'s render condition gates on
+ *     steal focus — `Presentation`'s render condition gates on
  *     `currentArtifactId != null`, so leaving both alone keeps the
  *     panel closed on history load. The CODE bucket (`.py`, `.js`,
- *     `Dockerfile`, тАж) is click-to-open *even on streaming*: source
+ *     `Dockerfile`, …) is click-to-open *even on streaming*: source
  *     files are typically supporting scripts the agent emits alongside
  *     a richer deliverable, and shoving the panel in front of the
  *     user every time a helper script gets written is disruptive.
@@ -68,8 +66,9 @@ interface ToolArtifactCardProps {
  *     of context.
  */
 const ToolArtifactCard = memo(({ attachment, artifact }: ToolArtifactCardProps) => {
-  const localize = useLocalize();
   const claimKey = useId();
+  const { isSubmitting, messageId } = useMessageContext();
+  const ownerMessageId = messageId || attachment.messageId || '';
   const file = attachment as TFile & TAttachmentMetadata;
   const fileId = file.file_id;
   const setVisible = useSetRecoilState(store.artifactsVisibility);
@@ -81,49 +80,31 @@ const ToolArtifactCard = memo(({ attachment, artifact }: ToolArtifactCardProps) 
   const [claim, setClaim] = useRecoilState(store.toolArtifactClaim(artifact.id));
   const isSelected = artifact.id === currentArtifactId;
   const isMyClaim = claim === claimKey;
-  /* Read+reset on mount only тАФ `useRecoilCallback` avoids subscribing
-   * to the per-file_id flag (no re-renders when other files resolve).
-   * The deferred-preview hook flips this to `true` on the pendingтЖТready
+  /* Read+reset only for this response — `useRecoilCallback` avoids subscribing
+   * to other file or message flags (no re-renders when other previews resolve).
+   * The deferred-preview hook flips this to `true` on the pending→ready
    * edge; we consume it once and reset, so repeat mounts (panel close
    * then reopen, history scroll) don't auto-open a second time. */
   const consumeJustResolved = useRecoilCallback(
     ({ snapshot, reset }) =>
-      (id: string) => {
-        const flagged = snapshot.getLoadable(store.previewJustResolved(id)).valueMaybe() ?? false;
+      (ownerId: string, id: string) => {
+        const signal = store.previewJustResolved([ownerId, id]);
+        const flagged = snapshot.getLoadable(signal).valueMaybe() ?? false;
         if (flagged) {
-          reset(store.previewJustResolved(id));
+          reset(signal);
         }
         return flagged;
       },
     [],
   );
-  /**
-   * Captured at first render via a non-subscribing snapshot read so the
-   * downstream effect doesn't re-fire (and the component doesn't
-   * re-render) every time `isSubmittingFamily(0)` flips. Cards that mount
-   * mid-stream stay "fresh" for the rest of their lifetime; cards that
-   * mount post-stream stay "history" even if the user sends a new
-   * message while this card stays mounted.
-   */
-  const readInitialIsSubmitting = useRecoilCallback(
-    ({ snapshot }) =>
-      () =>
-        // `valueMaybe()` returns `undefined` if the atom is in an error
-        // or loading state instead of throwing тАФ defensive against an
-        // upstream selector failure surfacing during card mount. The
-        // `?? false` default is correct because a card we can't classify
-        // as streaming is one we should treat as history (don't steal
-        // focus / open the panel).
-        snapshot.getLoadable(store.isSubmittingFamily(0)).valueMaybe() ?? false,
-    [],
-  );
-  const mountedDuringStreamRef = useRef<boolean | null>(null);
-  if (mountedDuringStreamRef.current === null) {
-    mountedDuringStreamRef.current = readInitialIsSubmitting();
+  /** Positional reconciliation can reuse this card for another response with the same file ID. */
+  const mountedDuringStreamRef = useRef({ ownerMessageId, isSubmitting: isSubmitting === true });
+  if (mountedDuringStreamRef.current.ownerMessageId !== ownerMessageId) {
+    mountedDuringStreamRef.current = { ownerMessageId, isSubmitting: isSubmitting === true };
   }
 
   useLayoutEffect(() => {
-    // Always (re)claim on mount тАФ a later card for the same id displaces
+    // Always (re)claim on mount — a later card for the same id displaces
     // an earlier one, so the chip migrates to the most recent mention.
     setClaim(claimKey);
     return () => {
@@ -155,7 +136,7 @@ const ToolArtifactCard = memo(({ attachment, artifact }: ToolArtifactCardProps) 
 
   useEffect(() => {
     if (isCodeOnlyArtifact(artifact.type)) {
-      // Source-code artifacts (`.py`, `.js`, `.cpp`, `Dockerfile`, тАж) are
+      // Source-code artifacts (`.py`, `.js`, `.cpp`, `Dockerfile`, …) are
       // click-to-open only. They're typically supporting scripts the
       // agent emits alongside a richer deliverable; auto-opening them
       // would shove the panel in front of the user every time a tool
@@ -165,31 +146,40 @@ const ToolArtifactCard = memo(({ attachment, artifact }: ToolArtifactCardProps) 
       return;
     }
     /* Two paths qualify the card for auto-open:
-     *   1. Streaming-time mount тАФ ref captured `isSubmitting === true`
-     *      at first render. The card is part of the live response, so
+     *   1. Streaming-time ownership — ref captured `isSubmitting === true`
+     *      when this message became the owner. The card is part of the live response, so
      *      the legacy "panel pops open as artifacts arrive" UX applies.
-     *   2. Just-resolved deferred preview тАФ `useAttachmentPreviewSync`
-     *      sets a one-shot flag on the pendingтЖТready edge. The
+     *   2. Just-resolved deferred preview — `useAttachmentPreviewSync`
+     *      sets a one-shot flag on the pending→ready edge. The
      *      deferred render can complete *after* the SSE stream closes,
      *      so checking only `isSubmitting` would miss this case (the
      *      chip would render in place but never auto-open). Consuming
      *      the flag also resets it, so subsequent re-mounts (panel
      *      close/reopen, history scroll) do not re-steal focus.
      * History mounts (file already resolved on page load) hit neither
-     * path, so the panel stays closed on navigation тАФ no jarring
+     * path, so the panel stays closed on navigation — no jarring
      * auto-open just from scrolling past an old artifact. */
-    const justResolved = fileId ? consumeJustResolved(fileId) : false;
-    if (!mountedDuringStreamRef.current && !justResolved) {
+    const justResolved =
+      fileId && ownerMessageId ? consumeJustResolved(ownerMessageId, fileId) : false;
+    if (!mountedDuringStreamRef.current.isSubmitting && !justResolved) {
       return;
     }
     // Streaming arrival or just-resolved preview: focus the new artifact
     // AND force the panel visible. Without `setVisible(true)`, a session
     // where the user had previously closed the panel (visibility=false)
     // would surface the selection in the chip ("click to close") but
-    // never actually open тАФ `Presentation` gates rendering on visibility.
+    // never actually open — `Presentation` gates rendering on visibility.
     setCurrentArtifactId(artifact.id);
     setVisible(true);
-  }, [artifact.id, artifact.type, fileId, consumeJustResolved, setCurrentArtifactId, setVisible]);
+  }, [
+    artifact.id,
+    artifact.type,
+    fileId,
+    ownerMessageId,
+    consumeJustResolved,
+    setCurrentArtifactId,
+    setVisible,
+  ]);
 
   const { handleDownload } = useAttachmentLink({
     href: attachment.filepath ?? '',
@@ -211,62 +201,26 @@ const ToolArtifactCard = memo(({ attachment, artifact }: ToolArtifactCardProps) 
     setVisible(true);
   };
 
-  // Another card with the same artifact id has the active claim тАФ render
-  // nothing here, that card is the canonical chip for this file.
+  // Another card with the same artifact id has the active claim — render
+  // nothing here, that row is the canonical trigger for this file.
   if (claim != null && !isMyClaim) {
     return null;
   }
 
-  const fileType = getFileType('artifact');
-  const actionLabel = isSelected
-    ? localize('com_ui_click_to_close')
-    : localize('com_ui_artifact_click');
-  const visibleFilename = displayFilename(attachment.filename);
   // The artifact's stored `title` mirrors the on-disk `filename` for
   // tool artifacts, so re-derive the user-facing label rather than
   // showing the collision-suffixed name.
   const visibleTitle = displayFilename(artifact.title);
 
   return (
-    <div className="group relative my-2 inline-flex max-w-fit items-stretch gap-px overflow-hidden rounded-xl text-sm text-text-primary shadow-sm">
-      <button
-        type="button"
-        onClick={handleOpen}
-        aria-pressed={isSelected}
-        className={cn(
-          'relative overflow-hidden rounded-l-xl transition-all duration-200 hover:bg-surface-hover active:scale-[0.99]',
-          {
-            'border-border-medium bg-surface-hover': isSelected,
-            'border-border-light bg-surface-tertiary': !isSelected,
-          },
-        )}
-      >
-        <div className="w-fit p-2">
-          <div className="flex flex-row items-center gap-2">
-            <FilePreview fileType={fileType} className="relative" />
-            <div className="overflow-hidden text-left">
-              <div className="truncate font-medium" title={visibleFilename}>
-                {visibleTitle}
-              </div>
-              <div className="truncate text-xs text-text-secondary">{actionLabel}</div>
-            </div>
-          </div>
-        </div>
-      </button>
-      <button
-        type="button"
-        onClick={handleDownload}
-        aria-label={`${localize('com_ui_download')} ${visibleFilename}`}
-        title={localize('com_ui_download')}
-        className={cn(
-          'flex shrink-0 items-center justify-center px-3 transition-colors duration-200',
-          'rounded-r-xl bg-surface-tertiary text-text-secondary hover:bg-surface-hover hover:text-text-primary',
-          'border-l border-border-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-heavy',
-        )}
-      >
-        <Download className="size-4" aria-hidden="true" />
-      </button>
-    </div>
+    <ArtifactRow
+      title={visibleTitle}
+      kind={artifactRowKind(artifact)}
+      isSelected={isSelected}
+      onOpen={handleOpen}
+      onDownload={handleDownload}
+      artifactId={artifact.id}
+    />
   );
 });
 

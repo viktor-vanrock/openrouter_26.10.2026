@@ -1,16 +1,16 @@
 import React from 'react';
-import FileSidePanel from './FileList/FileSidePanel';
+import { Button } from '@librechat/client';
 import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import FilesSectionSelector from './FilesSectionSelector';
+import FileSidePanel from './FileList/FileSidePanel';
 import { useLocalize } from '~/hooks';
-import { Button } from '@librechat/client';
 
 export default function FilesListView() {
   const params = useParams();
   const navigate = useNavigate();
   const localize = useLocalize();
   return (
-    <div className="bg-[#f9f9f9] p-0 lg:p-7">
+    <div className="bg-surface-primary p-0 lg:p-7">
       <div className="m-4 flex w-full flex-row justify-between md:m-2">
         <FilesSectionSelector />
         {params.fileId != null && params.fileId && (

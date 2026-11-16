@@ -1,10 +1,10 @@
 import { useCallback, useRef } from 'react';
-import { useRecoilCallback, useRecoilValue, useSetRecoilState } from 'recoil';
-import { isAxiosError } from 'axios';
 import { v4 } from 'uuid';
-import { useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useToastContext } from '@librechat/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useRecoilCallback, useRecoilValue, useSetRecoilState } from 'recoil';
 import {
   Constants,
   FileSources,
@@ -12,13 +12,14 @@ import {
   replaceSpecialVars,
   dataService,
 } from 'librechat-data-provider';
+import type { TMessage } from 'librechat-data-provider';
 import { useChatContext, useChatFormContext, useAddedChatContext } from '~/Providers';
-import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
+import usePrototypeAvailability from '~/hooks/Prototype/usePrototypeAvailability';
+import { useGetLatestMessage } from '~/hooks/Messages/useLatestMessage';
+import useSetFilesToDelete from '~/hooks/Files/useSetFilesToDelete';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { mainTextareaId } from '~/common';
 import store from '~/store';
-import usePrototypeAvailability from '~/hooks/Prototype/usePrototypeAvailability';
-import useSetFilesToDelete from '~/hooks/Files/useSetFilesToDelete';
 
 export default function useSubmitMessage() {
   const { user } = useAuthContext();
@@ -27,11 +28,20 @@ export default function useSubmitMessage() {
   filesToDeleteRef.current = setFilesToDelete;
   const methods = useChatFormContext();
   const { conversation: addedConvo } = useAddedChatContext();
-  const { ask, index, getMessages, setMessages, conversation, setConversation, files, setFiles, isSubmitting } =
-    useChatContext();
+  const {
+    ask,
+    index,
+    getMessages,
+    setMessages,
+    conversation,
+    setConversation,
+    files,
+    setFiles,
+    isSubmitting,
+  } = useChatContext();
   const imageSubmitInFlight = useRef(false);
   const { showToast } = useToastContext();
-  const latestMessage = useLatestMessage(index);
+  const getLatestMessage = useGetLatestMessage(index);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const prototypeAvailable = usePrototypeAvailability();
@@ -65,16 +75,25 @@ export default function useSubmitMessage() {
   const setActivePrompt = useSetRecoilState(store.activePromptByIndex(index));
 
   const submitMessage = useCallback(
-    async (data?: { text: string }, options?: { directImage?: boolean }) => {
+    (
+      data?: {
+        text: string;
+        overrideFiles?: TMessage['files'];
+        overrideQuotes?: string[];
+        overrideManualSkills?: string[];
+        overrideClientRequestId?: string;
+        overrideRecoverySteerId?: string;
+        overrideExpectedPredecessorCreatedAt?: number;
+        overrideQueuedMessageOrigin?: unknown;
+      },
+      options?: { directImage?: boolean },
+    ) => {
       if (!data) {
         return console.warn('No data provided to submitMessage');
       }
+      const latestMessage = getLatestMessage();
       if (prototypeMode && !prototypeAvailable) {
-        showToast({
-          message:
-            'Сервис прототипов временно недоступен. Выключите режим прототипа и отправьте сообщение в обычный чат.',
-          status: 'warning',
-        });
+        showToast({ message: 'Сервис прототипов временно недоступен.', status: 'warning' });
         return;
       }
       if (prototypeMode && prototypeSubmitting && prototypeAvailable) return;
@@ -87,184 +106,207 @@ export default function useSubmitMessage() {
       }
 
       if (prototypeMode) {
-        if (prototypeCard && prototypeCard.status !== 'completed' && !prototypeCard.actions.reply) {
-          showToast({
-            message: 'Wait for the prototype to request a reply or complete the current turn.',
-            status: 'warning',
-          });
-          return;
-        }
-        const submittedFiles = Array.from(files.values());
-        if (submittedFiles.length > 10) {
-          showToast({
-            message: 'К одному запросу можно приложить не более 10 документов.',
-            status: 'warning',
-          });
-          return;
-        }
-        if (submittedFiles.some((file) => file.progress !== 1)) {
-          showToast({ message: 'Дождитесь завершения загрузки файла.', status: 'warning' });
-          return;
-        }
-        if (submittedFiles.some((file) => file.source !== FileSources.text)) {
-          showToast({
-            message:
-              'Для ТЗ выберите «Загрузить как текст». Другие вложения пока не поддерживаются.',
-            status: 'warning',
-          });
-          return;
-        }
-        const targetConversationId =
-          !conversationId || conversationId === Constants.NEW_CONVO ? v4() : conversationId;
-        const text = data.text.trim();
-        if (!text) return;
-        const messageId = v4();
-        const parentMessageId = latestMessage?.messageId ?? Constants.NO_PARENT;
-        const modelId = conversation?.model ?? addedConvo?.model ?? rootMessages?.at(-1)?.model;
-        if (!modelId) {
-          showToast({ message: 'Select a model before starting a prototype.', status: 'warning' });
-          return;
-        }
-        if (!claimPrototypeSubmit()) return;
-        const optimisticMessage = {
-          messageId,
-          conversationId: targetConversationId,
-          parentMessageId,
-          text,
-          ...(submittedFiles.length
-            ? {
-                files: submittedFiles.map((file) => ({
-                  file_id: file.file_id,
-                  filename: file.filename,
-                  type: file.type?.startsWith('image/') ? 'text/plain' : (file.type ?? ''),
-                  source: file.source,
-                  bytes: file.size,
-                })),
-              }
-            : {}),
-          sender: 'User',
-          isCreatedByUser: true,
-          error: false,
-          metadata: { prototypeAgent: true },
-        };
-        setMessages([...(rootMessages ?? []), optimisticMessage]);
-        methods.reset();
-        try {
-          if (prototypeCard?.actions.reply === true && prototypeCard.promptMessageId != null) {
-            await dataService.saveMessage(targetConversationId, {
-              ...optimisticMessage,
-              model: modelId,
-              endpoint: conversation?.endpoint ?? undefined,
-              metadata: {
-                prototypeAgent: true,
-                prototypeReplyToMessageId: prototypeCard.promptMessageId,
-              },
+        void (async () => {
+          if (
+            prototypeCard &&
+            prototypeCard.status !== 'completed' &&
+            !prototypeCard.actions.reply
+          ) {
+            showToast({
+              message: 'Wait for the prototype to request a reply or complete the current turn.',
+              status: 'warning',
             });
-            await dataService.replyToPrototype(
-              prototypeCard.jobId,
-              targetConversationId,
-              {
-                messageId,
-                prototypeReplyToMessageId: prototypeCard.promptMessageId,
-              },
-              `reply:${messageId}`,
-              prototypeCard.revision,
-            );
-          } else {
-            await dataService.submitPrototypeTurn(
-              targetConversationId,
-              {
-                messageId,
-                parentMessageId,
-                text,
-                ...(submittedFiles.length
-                  ? { fileIds: submittedFiles.map((file) => file.file_id) }
-                  : {}),
-                modelId,
-                endpoint: conversation?.endpoint ?? undefined,
-                title: text.slice(0, 80),
-                revision: prototypeCard?.revision ?? null,
-              },
-              `chat:${messageId}`,
-            );
+            return;
           }
-          if (submittedFiles.length) {
-            const acceptedIds = new Set(submittedFiles.map((file) => file.file_id));
-            setFiles((current) => {
-              const remaining = new Map(
-                Array.from(current).filter(([, file]) => !acceptedIds.has(file.file_id)),
-              );
-              filesToDeleteRef.current(Object.fromEntries(remaining));
-              return remaining;
+          const submittedFiles = Array.from(files.values());
+          if (submittedFiles.length > 10) {
+            showToast({
+              message: 'К одному запросу можно приложить не более 10 документов.',
+              status: 'warning',
             });
+            return;
           }
-          if (targetConversationId !== conversationId) {
-            preservePrototypeMode(targetConversationId);
-            try {
-              setConversation(await dataService.getConversationById(targetConversationId));
-            } catch {
-              setConversation({
-                ...(addedConvo ?? conversation ?? {}),
-                conversationId: targetConversationId,
-                endpoint: conversation?.endpoint ?? addedConvo?.endpoint ?? null,
-                createdAt:
-                  addedConvo?.createdAt ?? conversation?.createdAt ?? new Date().toISOString(),
-                updatedAt:
-                  addedConvo?.updatedAt ?? conversation?.updatedAt ?? new Date().toISOString(),
+          if (submittedFiles.some((file) => file.progress !== 1)) {
+            showToast({ message: 'Дождитесь завершения загрузки файла.', status: 'warning' });
+            return;
+          }
+          if (submittedFiles.some((file) => file.source !== FileSources.text)) {
+            showToast({
+              message:
+                'Для ТЗ выберите «Загрузить как текст». Другие вложения пока не поддерживаются.',
+              status: 'warning',
+            });
+            return;
+          }
+          const targetConversationId =
+            !conversationId || conversationId === Constants.NEW_CONVO ? v4() : conversationId;
+          const text = data.text.trim();
+          if (!text) return;
+          const messageId = v4();
+          const parentMessageId = latestMessage?.messageId ?? Constants.NO_PARENT;
+          const modelId = conversation?.model ?? addedConvo?.model ?? rootMessages?.at(-1)?.model;
+          if (!modelId) {
+            showToast({
+              message: 'Select a model before starting a prototype.',
+              status: 'warning',
+            });
+            return;
+          }
+          if (!claimPrototypeSubmit()) return;
+          const optimisticMessage = {
+            messageId,
+            conversationId: targetConversationId,
+            parentMessageId,
+            text,
+            ...(submittedFiles.length
+              ? {
+                  files: submittedFiles.map((file) => ({
+                    file_id: file.file_id,
+                    filename: file.filename,
+                    type: file.type?.startsWith('image/') ? 'text/plain' : (file.type ?? ''),
+                    source: file.source,
+                    bytes: file.size,
+                  })),
+                }
+              : {}),
+            sender: 'User',
+            isCreatedByUser: true,
+            error: false,
+            metadata: { prototypeAgent: true },
+          };
+          setMessages([...(rootMessages ?? []), optimisticMessage]);
+          methods.reset();
+          try {
+            if (prototypeCard?.actions.reply === true && prototypeCard.promptMessageId != null) {
+              await dataService.saveMessage(targetConversationId, {
+                ...optimisticMessage,
                 model: modelId,
-                title: text.slice(0, 80),
+                endpoint: conversation?.endpoint ?? undefined,
+                metadata: {
+                  prototypeAgent: true,
+                  prototypeReplyToMessageId: prototypeCard.promptMessageId,
+                },
+              });
+              await dataService.replyToPrototype(
+                prototypeCard.jobId,
+                targetConversationId,
+                {
+                  messageId,
+                  prototypeReplyToMessageId: prototypeCard.promptMessageId,
+                },
+                `reply:${messageId}`,
+                prototypeCard.revision,
+              );
+            } else {
+              await dataService.submitPrototypeTurn(
+                targetConversationId,
+                {
+                  messageId,
+                  parentMessageId,
+                  text,
+                  ...(submittedFiles.length
+                    ? { fileIds: submittedFiles.map((file) => file.file_id) }
+                    : {}),
+                  modelId,
+                  endpoint: conversation?.endpoint ?? undefined,
+                  title: text.slice(0, 80),
+                  revision: prototypeCard?.revision ?? null,
+                },
+                `chat:${messageId}`,
+              );
+            }
+            if (submittedFiles.length) {
+              const acceptedIds = new Set(submittedFiles.map((file) => file.file_id));
+              setFiles((current) => {
+                const remaining = new Map(
+                  Array.from(current).filter(([, file]) => !acceptedIds.has(file.file_id)),
+                );
+                filesToDeleteRef.current(Object.fromEntries(remaining));
+                return remaining;
               });
             }
-            navigate(`/c/${targetConversationId}`);
-          }
-        } catch (error) {
-          setMessages(rootMessages ?? []);
-          if (!methods.getValues('text')?.trim()) {
-            methods.setValue('text', data.text, { shouldValidate: true });
-          }
-          const code = isAxiosError(error) ? error.response?.data?.error?.code : undefined;
-          const messages: Record<string, string> = {
-            PROTOTYPE_CONTENT_BLOCKED:
-              'Запрос отклонён по правилам содержания. Измените требования или содержимое ТЗ. Черновик и вложения сохранены.',
-            PROTOTYPE_MODERATION_UNAVAILABLE:
-              'Не удалось проверить содержание запроса. Генерация не запускалась. Черновик и вложения сохранены.',
-            PROTOTYPE_ATTACHMENT_INVALID:
-              'Не удалось прочитать ТЗ. Загрузите непустой документ через «Загрузить как текст». Черновик и вложения сохранены.',
-            PROTOTYPE_REQUIREMENTS_TOO_LARGE:
-              'Сообщение и текст ТЗ превышают 50 000 символов. Сократите документ или разделите доработки на несколько сообщений. Вложения сохранены.',
-            PROTOTYPE_MODEL_BLOCKED:
-              'This model is not allowed for prototypes. Select another model.',
-            PROTOTYPE_MODEL_UNSUPPORTED:
-              'This model does not support prototypes. Select another model.',
-            PROTOTYPE_STALE_REVISION:
-              'The prototype changed in another tab. Wait for the card to update and retry.',
-            PROTOTYPE_SERVICE_UNAVAILABLE:
-              'The Prototype service is unavailable. Your draft has been preserved.',
-            PROTOTYPE_QUEUE_UNAVAILABLE:
-              'The Prototype execution queue is unavailable. Your draft has been preserved.',
-          };
-          showToast({
-            message:
-              messages[code] ??
-              'The Prototype message could not be accepted. Your draft has been preserved; reload to recover server state.',
-            status: 'error',
-          });
-        } finally {
-          try {
-            await queryClient.invalidateQueries([QueryKeys.messages, targetConversationId]);
+            if (targetConversationId !== conversationId) {
+              preservePrototypeMode(targetConversationId);
+              try {
+                setConversation(await dataService.getConversationById(targetConversationId));
+              } catch {
+                setConversation({
+                  ...(addedConvo ?? conversation ?? {}),
+                  conversationId: targetConversationId,
+                  endpoint: conversation?.endpoint ?? addedConvo?.endpoint ?? null,
+                  createdAt:
+                    addedConvo?.createdAt ?? conversation?.createdAt ?? new Date().toISOString(),
+                  updatedAt:
+                    addedConvo?.updatedAt ?? conversation?.updatedAt ?? new Date().toISOString(),
+                  model: modelId,
+                  title: text.slice(0, 80),
+                });
+              }
+              navigate(`/c/${targetConversationId}`);
+            }
+          } catch (error) {
+            setMessages(rootMessages ?? []);
+            if (!methods.getValues('text')?.trim()) {
+              methods.setValue('text', data.text, { shouldValidate: true });
+            }
+            const code = isAxiosError(error) ? error.response?.data?.error?.code : undefined;
+            const messages: Record<string, string> = {
+              PROTOTYPE_CONTENT_BLOCKED:
+                'Запрос отклонён по правилам содержания. Измените требования или содержимое ТЗ. Черновик и вложения сохранены.',
+              PROTOTYPE_MODERATION_UNAVAILABLE:
+                'Не удалось проверить содержание запроса. Генерация не запускалась. Черновик и вложения сохранены.',
+              PROTOTYPE_ATTACHMENT_INVALID:
+                'Не удалось прочитать ТЗ. Загрузите непустой документ через «Загрузить как текст». Черновик и вложения сохранены.',
+              PROTOTYPE_REQUIREMENTS_TOO_LARGE:
+                'Сообщение и текст ТЗ превышают 50 000 символов. Сократите документ или разделите доработки на несколько сообщений. Вложения сохранены.',
+              PROTOTYPE_MODEL_BLOCKED:
+                'This model is not allowed for prototypes. Select another model.',
+              PROTOTYPE_MODEL_UNSUPPORTED:
+                'This model does not support prototypes. Select another model.',
+              PROTOTYPE_STALE_REVISION:
+                'The prototype changed in another tab. Wait for the card to update and retry.',
+              PROTOTYPE_SERVICE_UNAVAILABLE:
+                'The Prototype service is unavailable. Your draft has been preserved.',
+              PROTOTYPE_QUEUE_UNAVAILABLE:
+                'The Prototype execution queue is unavailable. Your draft has been preserved.',
+            };
+            showToast({
+              message:
+                messages[code] ??
+                'The Prototype message could not be accepted. Your draft has been preserved; reload to recover server state.',
+              status: 'error',
+            });
           } finally {
-            setPrototypeSubmitting(false);
+            try {
+              await queryClient.invalidateQueries([QueryKeys.messages, targetConversationId]);
+            } finally {
+              setPrototypeSubmitting(false);
+            }
           }
-        }
+        })();
         return;
       }
 
       const submitted = ask(
         {
           text: data.text,
+          ...(data.overrideRecoverySteerId != null && {
+            overrideUserMessageId: data.overrideRecoverySteerId,
+          }),
         },
         {
-          ...(options?.directImage ? { directImage: true } : { addedConvo: addedConvo ?? undefined }),
+          ...(options?.directImage
+            ? { directImage: true }
+            : { addedConvo: addedConvo ?? undefined }),
+          // Queued during-run messages carry their own consumed attachments,
+          // quote chips, and manual skill picks (undefined = drain composer).
+          overrideFiles: data.overrideFiles,
+          overrideQuotes: data.overrideQuotes,
+          overrideManualSkills: data.overrideManualSkills,
+          overrideClientRequestId: data.overrideClientRequestId,
+          overrideRecoverySteerId: data.overrideRecoverySteerId,
+          overrideExpectedPredecessorCreatedAt: data.overrideExpectedPredecessorCreatedAt,
+          overrideQueuedMessageOrigin: data.overrideQueuedMessageOrigin,
         },
       );
       if (submitted === false) {
@@ -279,7 +321,7 @@ export default function useSubmitMessage() {
       setMessages,
       setConversation,
       getMessages,
-      latestMessage,
+      getLatestMessage,
       prototypeMode,
       prototypeAvailable,
       prototypeSubmitting,
@@ -299,8 +341,14 @@ export default function useSubmitMessage() {
 
   const submitImage = useCallback(
     async (data: { text: string }) => {
-      if ((conversation?.endpoint as string | null | undefined) !== 'OpenRouter' ||
-        !data.text.trim() || prototypeMode || isSubmitting || imageSubmitInFlight.current) return;
+      if (
+        (conversation?.endpoint as string | null | undefined) !== 'OpenRouter' ||
+        !data.text.trim() ||
+        prototypeMode ||
+        isSubmitting ||
+        imageSubmitInFlight.current
+      )
+        return;
       imageSubmitInFlight.current = true;
       try {
         await submitMessage(data, { directImage: true });
@@ -315,9 +363,12 @@ export default function useSubmitMessage() {
     (text: string) => {
       const parsedText = replaceSpecialVars({ text, user });
       if (autoSendPrompts) {
-        submitMessage({ text: parsedText });
+        void submitMessage({ text: parsedText });
         return;
       }
+      /** A refused auto-send still belongs to the user. Stage it exactly like
+       * a non-auto-sent prompt so every picker, including variable dialogs,
+       * preserves the text for the composer's guarded submit route. */
 
       const textarea = document.getElementById(mainTextareaId) as HTMLTextAreaElement | null;
       const currentText = textarea?.value ?? methods.getValues('text');

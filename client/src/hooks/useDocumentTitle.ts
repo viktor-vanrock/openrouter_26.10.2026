@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { APP_NAME } from '~/utils/brand';
 
-function useDocumentTitle() {
+function useDocumentTitle(title = APP_NAME) {
   useEffect(() => {
-    document.title = APP_NAME;
-  }, []);
+    document.title = title;
+  }, [title]);
 }
 
 export default useDocumentTitle;
