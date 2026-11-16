@@ -72,7 +72,7 @@ const {
   createPrototypeControlPlaneStartup,
 } = require('./services/Prototypes/PrototypeControlPlaneStartup');
 
-const pkg = require('../../packages/api/dist/index.js');
+const pkg = require('@librechat/api');
 const openrouterBalanceRoutes =
   pkg.OpenrouterStatisticsRoutes || pkg.default?.OpenrouterStatisticsRoutes;
 const logsRoutes = pkg.LogsRoutes || pkg.default?.LogsRoutes;
