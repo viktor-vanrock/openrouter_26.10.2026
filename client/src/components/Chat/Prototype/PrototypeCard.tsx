@@ -1,22 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Spinner } from '@librechat/client';
-import { Download, RotateCcw, Square, WandSparkles } from 'lucide-react';
-import { useSetRecoilState } from 'recoil';
-import { useQueryClient } from '@tanstack/react-query';
 import { SSE } from 'sse.js';
 import { isAxiosError } from 'axios';
+import { useSetRecoilState } from 'recoil';
+import { Button, Spinner } from '@librechat/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { Download, RotateCcw, Square, WandSparkles } from 'lucide-react';
 import {
   apiBaseUrl,
   dataService,
   getTokenHeader,
   QueryKeys,
   request,
-  type PrototypeCardData,
 } from 'librechat-data-provider';
-import store from '~/store';
-import { useShareContext } from '~/Providers';
+import type { PrototypeCardData } from 'librechat-data-provider';
 import PrototypeProgress from './PrototypeProgress';
 import PrototypeMetrics from './PrototypeMetrics';
+import { useShareContext } from '~/Providers';
+import { useLocalize } from '~/hooks';
+import store from '~/store';
 
 function actionKey(action: string) {
   return `${action}:${crypto.randomUUID()}`;
@@ -83,6 +84,7 @@ export default function PrototypeCard({ conversationId }: { conversationId: stri
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [disconnected, setDisconnected] = useState(false);
+  const localize = useLocalize();
   const cursor = useRef(-1);
   const bindingEpoch = useRef(0);
   const { isSharedConvo } = useShareContext();
@@ -365,12 +367,18 @@ export default function PrototypeCard({ conversationId }: { conversationId: stri
         </p>
       )}
       {card.failure && (
-        <p
+        <div
           role="alert"
           className="mt-3 rounded-lg bg-red-500/10 p-2 text-sm text-red-700 dark:text-red-300"
         >
-          {activityLabels[card.failure.message] ?? card.failure.message}
-        </p>
+          <p>{activityLabels[card.failure.message] ?? card.failure.message}</p>
+          {card.failure.diagnosticCode && (
+            <p className="mt-1 text-xs text-text-secondary">
+              {localize('com_prototype_diagnostic_code')}:{' '}
+              <code>{card.failure.diagnosticCode}</code>
+            </p>
+          )}
+        </div>
       )}
       {error && (
         <p role="alert" className="mt-3 text-sm text-red-600">

@@ -19,6 +19,32 @@ export const prototypeWaitingReasonSchema = z.enum(['clarification', 'plan_appro
 
 export type PrototypeWaitingReason = z.infer<typeof prototypeWaitingReasonSchema>;
 
+export const prototypeDiagnosticCodeSchema = z.enum([
+  'LIVE_MODEL_BOUNDS_UNAVAILABLE',
+  'LIVE_MODEL_BUDGET_EXCEEDED',
+  'LIVE_MODEL_BUDGET_UNAVAILABLE',
+  'LIVE_MODEL_CONFIG_INVALID',
+  'LIVE_MODEL_CONTENT_BLOCKED',
+  'LIVE_MODEL_EXECUTION_STALE',
+  'LIVE_MODEL_KEY_FILE_INVALID',
+  'LIVE_MODEL_KEY_LIMIT_REQUIRED',
+  'LIVE_MODEL_MODERATION_UNAVAILABLE',
+  'LIVE_MODEL_OUTPUT_INCOMPLETE',
+  'LIVE_MODEL_OUTPUT_LIMIT',
+  'LIVE_MODEL_PREFLIGHT_FAILED',
+  'LIVE_MODEL_PRICE_UNKNOWN',
+  'LIVE_MODEL_PROMPT_INVALID',
+  'LIVE_MODEL_PROMPT_TOO_LARGE',
+  'LIVE_MODEL_PROVIDER_FUNDS_REQUIRED',
+  'LIVE_MODEL_RATE_LIMITED',
+  'LIVE_MODEL_RESPONSE_INVALID',
+  'LIVE_MODEL_RESPONSE_TOO_LARGE',
+  'LIVE_MODEL_TIMEOUT',
+  'LIVE_MODEL_UPSTREAM_UNAVAILABLE',
+]);
+
+export type PrototypeDiagnosticCode = z.infer<typeof prototypeDiagnosticCodeSchema>;
+
 export const costEstimateSchema = z
   .object({
     currency: z.literal('USD'),
@@ -85,7 +111,11 @@ export const prototypeCardDataSchema = z
     previewAvailable: z.boolean(),
     sourcesAvailable: z.boolean(),
     failure: z
-      .object({ code: z.string().min(1), message: z.string().min(1) })
+      .object({
+        code: z.string().min(1),
+        message: z.string().min(1),
+        diagnosticCode: prototypeDiagnosticCodeSchema.optional(),
+      })
       .strict()
       .nullable(),
     activity: z.array(prototypeActivitySchema).max(100),
