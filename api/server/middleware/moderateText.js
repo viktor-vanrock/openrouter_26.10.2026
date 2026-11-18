@@ -1,3 +1,4 @@
+const { getReferencedQuotes, mergeQuotedText } = require('@librechat/api');
 const { logger } = require('@librechat/data-schemas');
 const { ErrorTypes } = require('librechat-data-provider');
 const denyRequest = require('./denyRequest');
@@ -6,7 +7,19 @@ const { isTextFlagged } = require('../services/TextModeration');
 async function moderateText(req, res, next) {
   try {
     const { text } = req.body;
-    if (await isTextFlagged(text)) {
+    const safeText = typeof text === 'string' ? text : '';
+    const inputs = [];
+    if (safeText.length > 0) {
+      inputs.push(safeText);
+    }
+    const quotes = getReferencedQuotes(req.body.quotes);
+    if (quotes != null) {
+      inputs.push(...quotes);
+      inputs.push(mergeQuotedText(safeText, quotes));
+    }
+    const input = inputs.length > 1 ? inputs : (inputs[0] ?? text);
+
+    if (await isTextFlagged(input)) {
       const type = ErrorTypes.MODERATION;
       const errorMessage = { type };
       return await denyRequest(req, res, errorMessage);

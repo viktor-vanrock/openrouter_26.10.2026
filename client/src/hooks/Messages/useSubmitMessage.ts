@@ -13,8 +13,8 @@ import {
   dataService,
 } from 'librechat-data-provider';
 import { useChatContext, useChatFormContext, useAddedChatContext } from '~/Providers';
-import { useAuthContext } from '~/hooks/AuthContext';
 import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
+import { useAuthContext } from '~/hooks/AuthContext';
 import { mainTextareaId } from '~/common';
 import store from '~/store';
 import usePrototypeAvailability from '~/hooks/Prototype/usePrototypeAvailability';
@@ -259,7 +259,7 @@ export default function useSubmitMessage() {
         return;
       }
 
-      ask(
+      const submitted = ask(
         {
           text: data.text,
         },
@@ -267,6 +267,9 @@ export default function useSubmitMessage() {
           ...(options?.directImage ? { directImage: true } : { addedConvo: addedConvo ?? undefined }),
         },
       );
+      if (submitted === false) {
+        return false;
+      }
       methods.reset();
     },
     [

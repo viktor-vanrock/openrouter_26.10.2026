@@ -4,25 +4,39 @@ import { Outlet } from 'react-router-dom';
 import { useMediaQuery, ThemeContext } from '@librechat/client';
 
 import {
-  useSearchEnabled,
-  useAssistantsMap,
-  useAuthContext,
-  useAgentsMap,
-  useFileMap,
-} from '~/hooks';
-import store from '~/store';
-import {
   PromptGroupsProvider,
   AssistantsMapContext,
   AgentsMapContext,
   SetConvoProvider,
   FileMapContext,
 } from '~/Providers';
+import {
+  useSearchEnabled,
+  useAssistantsMap,
+  useAuthContext,
+  useAgentsMap,
+  useFileMap,
+} from '~/hooks';
+import KeyboardShortcutsDialog from '~/components/Nav/KeyboardShortcutsDialog';
+import KeyboardDeleteDialog from '~/components/Nav/KeyboardDeleteDialog';
 import { useUserTermsQuery, useGetStartupConfig } from '~/data-provider';
+import useKeyboardShortcuts from '~/hooks/useKeyboardShortcuts';
 import { UnifiedSidebar } from '~/components/UnifiedSidebar';
 import { TermsAndConditionsModal } from '~/components/ui';
 import { useHealthCheck } from '~/data-provider';
 import { Banner } from '~/components/Banners';
+import store from '~/store';
+
+/** Isolates keyboard shortcut listeners so they only mount after auth. */
+function KeyboardShortcutsProvider() {
+  useKeyboardShortcuts();
+  return (
+    <>
+      <KeyboardShortcutsDialog />
+      <KeyboardDeleteDialog />
+    </>
+  );
+}
 
 export default function Root() {
   const [showTerms, setShowTerms] = useState(false);
@@ -108,6 +122,7 @@ export default function Root() {
               modalContent={config.interface.termsOfService.modalContent}
             />
           )}
+          <KeyboardShortcutsProvider />
         </AssistantsMapContext.Provider>
       </FileMapContext.Provider>
     </SetConvoProvider>

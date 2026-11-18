@@ -5,6 +5,7 @@ import type { TMessage } from 'librechat-data-provider';
 import type { TMessageProps, TMessageIcon, TMessageChatContext } from '~/common';
 import { cn, getHeaderPrefixForScreenReader, getMessageAriaLabel } from '~/utils';
 import MessageContent from '~/components/Chat/Messages/Content/MessageContent';
+import MessageTimestamp from '~/components/Chat/Messages/ui/MessageTimestamp';
 import { useLocalize, useMessageActions, useContentMetadata } from '~/hooks';
 import PlaceholderRow from '~/components/Chat/Messages/ui/PlaceholderRow';
 import SiblingSwitch from '~/components/Chat/Messages/SiblingSwitch';
@@ -73,6 +74,7 @@ function areMessageRenderPropsEqual(prev: MessageRenderProps, next: MessageRende
     prevMsg.text === nextMsg.text &&
     prevMsg.error === nextMsg.error &&
     prevMsg.unfinished === nextMsg.unfinished &&
+    prevMsg.createdAt === nextMsg.createdAt &&
     prevMsg.depth === nextMsg.depth &&
     prevMsg.isCreatedByUser === nextMsg.isCreatedByUser &&
     (prevMsg.children?.length ?? 0) === (nextMsg.children?.length ?? 0) &&
@@ -81,7 +83,8 @@ function areMessageRenderPropsEqual(prev: MessageRenderProps, next: MessageRende
     prevMsg.endpoint === nextMsg.endpoint &&
     prevMsg.iconURL === nextMsg.iconURL &&
     prevMsg.feedback?.rating === nextMsg.feedback?.rating &&
-    (prevMsg.files?.length ?? 0) === (nextMsg.files?.length ?? 0)
+    (prevMsg.files?.length ?? 0) === (nextMsg.files?.length ?? 0) &&
+    (prevMsg.quotes?.length ?? 0) === (nextMsg.quotes?.length ?? 0)
   );
 }
 
@@ -186,7 +189,7 @@ const MessageRender = memo(function MessageRender({
   };
 
   const conditionalClasses = {
-    focus: 'focus:outline-none focus:ring-2 focus:ring-border-xheavy p-3',
+    focus: 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-xheavy p-3',
   };
 
   return (
@@ -220,6 +223,7 @@ const MessageRender = memo(function MessageRender({
           <h2 className={cn('select-none font-semibold', fontSize)}>
             <span className="sr-only">{getHeaderPrefixForScreenReader(msg, localize)}</span>
             {messageLabel}
+            <MessageTimestamp value={msg.createdAt ?? msg.clientTimestamp} />
           </h2>
         )}
 

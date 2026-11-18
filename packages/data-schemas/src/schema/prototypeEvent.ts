@@ -1,4 +1,5 @@
 import { Schema } from 'mongoose';
+import { prototypeDiagnosticCodeSchema } from 'librechat-data-provider';
 import type { IPrototypeEvent } from '~/types/prototype';
 
 const CARD_FIELDS = [
@@ -134,7 +135,14 @@ function isExactPrototypeCardData(value: unknown): boolean {
       (typeof card.failure === 'object' &&
         !Array.isArray(card.failure) &&
         typeof (card.failure as Record<string, unknown>).code === 'string' &&
-        typeof (card.failure as Record<string, unknown>).message === 'string')) &&
+        typeof (card.failure as Record<string, unknown>).message === 'string' &&
+        Object.keys(card.failure).every((key) =>
+          ['code', 'message', 'diagnosticCode'].includes(key),
+        ) &&
+        ((card.failure as Record<string, unknown>).diagnosticCode === undefined ||
+          prototypeDiagnosticCodeSchema.safeParse(
+            (card.failure as Record<string, unknown>).diagnosticCode,
+          ).success))) &&
     Array.isArray(card.activity) &&
     Array.isArray(card.versions) &&
     typeof card.actions === 'object' &&

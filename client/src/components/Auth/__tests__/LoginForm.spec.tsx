@@ -1,9 +1,9 @@
-import { render, getByTestId } from 'test/layout-test-utils';
 import userEvent from '@testing-library/user-event';
 import type { TStartupConfig } from 'librechat-data-provider';
 import * as endpointQueries from '~/data-provider/Endpoints/queries';
 import * as miscDataProvider from '~/data-provider/Misc/queries';
 import * as authMutations from '~/data-provider/Auth/mutations';
+import { render, getByTestId } from 'test/layout-test-utils';
 import * as authQueries from '~/data-provider/Auth/queries';
 import Login from '../LoginForm';
 
@@ -18,8 +18,10 @@ const mockStartupConfig: TStartupConfig = {
   githubLoginEnabled: true,
   googleLoginEnabled: true,
   openidLoginEnabled: true,
+  appleLoginEnabled: false,
   openidLabel: 'Test OpenID',
   openidImageUrl: 'http://test-server.com',
+  openidAutoRedirect: false,
   samlLoginEnabled: true,
   samlLabel: 'Test SAML',
   samlImageUrl: 'http://test-server.com',
@@ -33,13 +35,11 @@ const mockStartupConfig: TStartupConfig = {
     enabled: false,
   },
   emailEnabled: false,
-  helpAndFaqURL: '',
-  appleLoginEnabled: false,
-  openidAutoRedirect: false,
   showBirthdayIcon: false,
-  sharedLinksEnabled: false,
-  publicSharedLinksEnabled: false,
-  allowAccountDeletion: false,
+  helpAndFaqURL: '',
+  sharedLinksEnabled: true,
+  publicSharedLinksEnabled: true,
+  allowAccountDeletion: true,
 };
 
 const setup = ({
@@ -111,10 +111,10 @@ beforeEach(() => {
 test('renders login form', () => {
   const { getByLabelText } = render(
     <Login
-      error={undefined}
-      setError={jest.fn()}
       onSubmit={mockLogin}
       startupConfig={mockStartupConfig}
+      error={undefined}
+      setError={jest.fn()}
     />,
   );
   expect(getByLabelText(/email/i)).toBeInTheDocument();
@@ -122,12 +122,12 @@ test('renders login form', () => {
 });
 
 test('submits login form', async () => {
-  const { getByLabelText, getByRole } = render(
+  const { getByLabelText } = render(
     <Login
-      error={undefined}
-      setError={jest.fn()}
       onSubmit={mockLogin}
       startupConfig={mockStartupConfig}
+      error={undefined}
+      setError={jest.fn()}
     />,
   );
   const emailInput = getByLabelText(/email/i);
@@ -142,12 +142,12 @@ test('submits login form', async () => {
 });
 
 test('displays validation error messages', async () => {
-  const { getByLabelText, getByRole, getByText } = render(
+  const { getByLabelText, getByText } = render(
     <Login
-      error={undefined}
-      setError={jest.fn()}
       onSubmit={mockLogin}
       startupConfig={mockStartupConfig}
+      error={undefined}
+      setError={jest.fn()}
     />,
   );
   const emailInput = getByLabelText(/email/i);

@@ -1,3 +1,5 @@
+const { prototypeDiagnosticCodeSchema } = require('librechat-data-provider');
+
 function identity(event, session) {
   return {
     jobId: event.jobId,
@@ -21,9 +23,16 @@ function checkpoint(payload) {
   };
 }
 
+const SAFE_DIAGNOSTIC_CODES = new Set(prototypeDiagnosticCodeSchema.options);
+
 class PrototypeEventApplier {
   constructor({
-    updateExecution, finishExecution, verifyPublication, acceptPublication, advanceStage, repairStage,
+    updateExecution,
+    finishExecution,
+    verifyPublication,
+    acceptPublication,
+    advanceStage,
+    repairStage,
   }) {
     this.updateExecution = updateExecution;
     this.finishExecution = finishExecution;
@@ -59,16 +68,27 @@ class PrototypeEventApplier {
           ...checkpoint(event.payload),
         });
       case 'failed':
-        if (event.stage === 'build_qa' && event.pipelineStep === 4 && event.payload.retryable === true &&
-            ['PROTOTYPE_BUILD_FAILED', 'PROTOTYPE_QA_FAILED'].includes(event.payload.code) &&
-            typeof this.repairStage === 'function') {
+        if (
+          event.stage === 'build_qa' &&
+          event.pipelineStep === 4 &&
+          event.payload.retryable === true &&
+          ['PROTOTYPE_BUILD_FAILED', 'PROTOTYPE_QA_FAILED'].includes(event.payload.code) &&
+          typeof this.repairStage === 'function'
+        ) {
           const repair = await this.repairStage({ event, session });
           if (repair?.repaired) return repair;
         }
         return this.finishExecution({
           ...input,
           to: 'failed',
-          failure: { code: event.payload.code, message: event.payload.message },
+          failure: {
+            code: event.payload.code,
+            message: event.payload.message,
+            ...(event.stage === 'generation' &&
+            SAFE_DIAGNOSTIC_CODES.has(event.payload.diagnostics?.[0])
+              ? { diagnosticCode: event.payload.diagnostics[0] }
+              : {}),
+          },
         });
       case 'canceled':
         return this.finishExecution({ ...input, to: 'canceled' });
@@ -84,7 +104,10 @@ class PrototypeEventApplier {
   }
 
   async applyPublication(event, session) {
-    if (typeof this.verifyPublication !== 'function' || typeof this.acceptPublication !== 'function') {
+    if (
+      typeof this.verifyPublication !== 'function' ||
+      typeof this.acceptPublication !== 'function'
+    ) {
       throw new Error('Prototype publication event requires the artifact transaction adapter');
     }
     const artifacts = await this.verifyPublication({ event, session });
@@ -92,9 +115,15 @@ class PrototypeEventApplier {
     for (const kind of ['checkpoint', 'html', 'sources_zip', 'qa_evidence']) {
       const artifact = byKind.get(kind);
       const reference = event.payload.artifacts.find((item) => item.kind === kind);
-      if (!artifact || artifact.executionId !== event.executionId || artifact.revision !== event.expectedRevision ||
-          artifact.jobId !== event.jobId || artifact.digest !== reference?.digest ||
-          artifact.templateDigest !== reference?.templateDigest || artifact.toolchainDigest !== reference?.toolchainDigest) {
+      if (
+        !artifact ||
+        artifact.executionId !== event.executionId ||
+        artifact.revision !== event.expectedRevision ||
+        artifact.jobId !== event.jobId ||
+        artifact.digest !== reference?.digest ||
+        artifact.templateDigest !== reference?.templateDigest ||
+        artifact.toolchainDigest !== reference?.toolchainDigest
+      ) {
         throw new Error('PROTOTYPE_ARTIFACT_METADATA_MISMATCH');
       }
     }
@@ -104,12 +133,17 @@ class PrototypeEventApplier {
     const html = byKind.get('html');
     const sources = byKind.get('sources_zip');
     return this.acceptPublication({
-      ...identity(event, session), to: event.payload.type === 'completed' ? 'completed' : 'review',
-      checkpointRevision: event.payload.checkpoint.revision, checkpointDigest: event.payload.checkpoint.digest,
-      previewArtifactId: html.artifactId, previewDigest: html.digest,
-      sourcesArtifactId: sources.artifactId, sourcesDigest: sources.digest,
+      ...identity(event, session),
+      to: event.payload.type === 'completed' ? 'completed' : 'review',
+      checkpointRevision: event.payload.checkpoint.revision,
+      checkpointDigest: event.payload.checkpoint.digest,
+      previewArtifactId: html.artifactId,
+      previewDigest: html.digest,
+      sourcesArtifactId: sources.artifactId,
+      sourcesDigest: sources.digest,
       qaArtifactId: byKind.get('qa_evidence').artifactId,
-      templateDigest: html.templateDigest, toolchainDigest: html.toolchainDigest,
+      templateDigest: html.templateDigest,
+      toolchainDigest: html.toolchainDigest,
     });
   }
 

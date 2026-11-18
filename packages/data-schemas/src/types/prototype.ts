@@ -1,6 +1,7 @@
 import type {
   CostEstimate,
   PrototypeCardData,
+  PrototypeDiagnosticCode,
   PrototypeJobStatus,
   PrototypeWaitingReason,
 } from 'librechat-data-provider';
@@ -9,7 +10,12 @@ import type { Document, Types } from 'mongoose';
 export type PrototypeModelRecommendation = 'recommended' | 'not_recommended';
 export type PrototypeTurnKind = 'initial' | 'user_reply' | 'recovery_retry';
 export type PrototypeTurnStatus = 'pending' | 'running' | 'applied' | 'failed' | 'canceled';
-export type PrototypeArtifactKind = 'checkpoint' | 'dependency_bundle' | 'html' | 'sources_zip' | 'qa_evidence';
+export type PrototypeArtifactKind =
+  | 'checkpoint'
+  | 'dependency_bundle'
+  | 'html'
+  | 'sources_zip'
+  | 'qa_evidence';
 export type PrototypeOutboxKind = 'start_turn' | 'execute_stage' | 'cancel_execution';
 export type PrototypeOutboxStatus = 'pending' | 'publishing' | 'published' | 'failed';
 
@@ -26,6 +32,7 @@ export interface PrototypeGenerationBinding {
 export interface PrototypeSafeFailure {
   code: string;
   message: string;
+  diagnosticCode?: PrototypeDiagnosticCode;
 }
 
 export interface PrototypeActivity {

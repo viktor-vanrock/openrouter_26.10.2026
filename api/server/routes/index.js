@@ -6,6 +6,7 @@ const adminConfig = require('./admin/config');
 const adminGrants = require('./admin/grants');
 const adminGroups = require('./admin/groups');
 const adminRoles = require('./admin/roles');
+const adminSkills = require('./admin/skills');
 const adminUsers = require('./admin/users');
 const adminUserActivity = require('./admin/userActivity');
 const adminNewUsers = require('./admin/newUsers');
@@ -13,11 +14,13 @@ const adminMessageStats = require('./admin/messageStats');
 const adminModelShare = require('./admin/modelShare');
 const adminGuides = require('./admin/guides');
 const adminReleases = require('./admin/releases');
+const adminAuditLog = require('./admin/audit');
 const endpoints = require('./endpoints');
 const staticRoute = require('./static');
 const messages = require('./messages');
 const memories = require('./memories');
 const presets = require('./presets');
+const projects = require('./projects');
 const prompts = require('./prompts');
 const skills = require('./skills');
 const balance = require('./balance');
@@ -42,8 +45,10 @@ const prototypes = require('./prototypes');
 const guides = require('./guides');
 const releases = require('./releases');
 const openrouterPricing = require('./openrouterPricing');
+const rum = require('./rum');
 
 module.exports = {
+  rum,
   mcp,
   prototypes,
   guides,
@@ -55,6 +60,7 @@ module.exports = {
   adminGrants,
   adminGroups,
   adminRoles,
+  adminSkills,
   adminUsers,
   adminUserActivity,
   adminNewUsers,
@@ -62,6 +68,7 @@ module.exports = {
   adminModelShare,
   adminGuides,
   adminReleases,
+  adminAuditLog,
   keys,
   apiKeys,
   user,
@@ -77,6 +84,7 @@ module.exports = {
   config,
   models,
   prompts,
+  projects,
   skills,
   actions,
   presets,

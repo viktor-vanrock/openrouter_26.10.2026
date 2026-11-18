@@ -43,6 +43,7 @@ function MessagesViewContent({
   const hasPrototypeProjection = containsPrototypeProjection(_messagesTree);
 
   const {
+    contentRef,
     scrollableRef,
     messagesEndRef,
     showScrollButton,
@@ -64,7 +65,7 @@ function MessagesViewContent({
               width: '100%',
             }}
           >
-            <div className="flex flex-col pb-9 dark:bg-transparent">
+            <div ref={contentRef} className="flex flex-col pb-9 dark:bg-transparent">
               {(_messagesTree && _messagesTree.length == 0) || _messagesTree === null ? (
                 <div
                   className={cn(

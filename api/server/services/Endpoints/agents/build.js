@@ -8,7 +8,7 @@ const { getOpenRouterImageConfig, isDirectImageRequest } = require('./openrouter
 const loadAgent = (params) => loadAgentFn(params, { getAgent: db.getAgent, getMCPServerTools });
 
 const buildOptions = (req, endpoint, parsedBody, endpointType) => {
-  const { spec, iconURL, agent_id, ...parsedParameters } = parsedBody;
+  const { spec, iconURL, agent_id, chatProjectId, ...parsedParameters } = parsedBody;
   const directImage = isDirectImageRequest(req);
   const model_parameters = directImage
     ? { model: getOpenRouterImageConfig().model }
@@ -42,6 +42,7 @@ const buildOptions = (req, endpoint, parsedBody, endpointType) => {
     endpoint,
     agent_id,
     endpointType,
+    chatProjectId,
     model_parameters,
     agent: agentPromise,
     addedConvo,

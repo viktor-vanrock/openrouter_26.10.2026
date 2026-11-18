@@ -1,5 +1,5 @@
 import { Schema } from 'mongoose';
-import type { PrototypeJobStatus } from 'librechat-data-provider';
+import { prototypeDiagnosticCodeSchema, type PrototypeJobStatus } from 'librechat-data-provider';
 import type { IPrototypeJob } from '~/types/prototype';
 import prototypeGenerationSchema from './prototypeGeneration';
 
@@ -38,6 +38,7 @@ const safeFailureSchema = new Schema(
   {
     code: { type: String, required: true },
     message: { type: String, required: true },
+    diagnosticCode: { type: String, enum: prototypeDiagnosticCodeSchema.options },
   },
   { _id: false },
 );
@@ -93,7 +94,14 @@ const prototypeJobSchema = new Schema<IPrototypeJob>(
       enum: ['generation', 'transfer', 'dependency_preparation', 'build_qa', 'publish', null],
       default: null,
     },
-    pipelineStep: { type: Number, required: true, min: 0, max: 5, validate: Number.isInteger, default: 0 },
+    pipelineStep: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 5,
+      validate: Number.isInteger,
+      default: 0,
+    },
     checkpointRevision: {
       type: Number,
       default: null,
@@ -120,7 +128,13 @@ const prototypeJobSchema = new Schema<IPrototypeJob>(
       enum: ['none', 'pending', 'running', 'completed', 'failed'],
       default: 'none',
     },
-    cleanupAttempts: { type: Number, required: true, min: 0, validate: Number.isInteger, default: 0 },
+    cleanupAttempts: {
+      type: Number,
+      required: true,
+      min: 0,
+      validate: Number.isInteger,
+      default: 0,
+    },
     cleanupNextAttemptAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },
   },
