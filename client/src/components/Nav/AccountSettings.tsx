@@ -16,6 +16,7 @@ import {
 import { ArchivedChatsModal } from '~/components/Nav/SettingsTabs/General/ArchivedChatsModal';
 import { MyFilesModal } from '~/components/Chat/Input/Files/MyFilesModal';
 import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
+import { hasDevelopingCookie } from '~/utils/developingCookie';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { useLocalize } from '~/hooks';
 import Settings from './Settings';
@@ -156,12 +157,14 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
             <DropdownMenuSeparator />
           </>
         )}
-        <HelpSubmenu
-          helpAndFaqURL={startupConfig?.helpAndFaqURL}
-          termsOfServiceURL={startupConfig?.interface?.termsOfService?.externalUrl}
-          privacyPolicyURL={startupConfig?.interface?.privacyPolicy?.externalUrl}
-          onShowShortcuts={() => setShowShortcutsDialog(true)}
-        />
+        {hasDevelopingCookie() && (
+          <HelpSubmenu
+            helpAndFaqURL={startupConfig?.helpAndFaqURL}
+            termsOfServiceURL={startupConfig?.interface?.termsOfService?.externalUrl}
+            privacyPolicyURL={startupConfig?.interface?.privacyPolicy?.externalUrl}
+            onShowShortcuts={() => setShowShortcutsDialog(true)}
+          />
+        )}
         <Menu.MenuItem onClick={() => setShowFiles(true)} className="select-item text-sm">
           <FileText className="icon-md" aria-hidden="true" />
           {localize('com_nav_my_files')}
