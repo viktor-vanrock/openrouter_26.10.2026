@@ -50,35 +50,93 @@ jest.mock('~/config', () => ({
 
 describe('AgentClient - titleConvo', () => {
   describe('direct image request isolation', () => {
+    it('uses the shared image generator and saves its artifact in direct mode', async () => {
+      const imageService = require('~/server/services/Images/openrouter');
+      const generate = jest.spyOn(imageService, 'generateImage').mockResolvedValue({
+        model: 'image/model',
+        url: 'data:image/png;base64,YQ==',
+      });
+      const callback = jest.fn();
+      const client = Object.create(AgentClient.prototype);
+      client.options = {
+        req: {
+          user: { id: 'user' },
+          body: {
+            endpoint: 'OpenRouter',
+            image_generation_direct: true,
+            imageModel: 'image/model',
+          },
+          config: {},
+        },
+        directImageCallback: callback,
+      };
+      client.collectedUsage = [];
+      client.responseMessageId = 'message';
+      client.conversationId = 'conversation';
+      const response = await client.sendCompletion([{ role: 'user', content: 'A cat' }]);
+      expect(generate).toHaveBeenCalledWith(
+        expect.objectContaining({ req: client.options.req, prompt: 'A cat' }),
+      );
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({ output: expect.objectContaining({ name: 'openrouter' }) }),
+        expect.objectContaining({ run_id: 'message' }),
+      );
+      expect(response.completion).toBeDefined();
+      generate.mockRestore();
+    });
+
     it('preserves selected conversation parameters without mutating the artist request', () => {
       const artistParameters = { model: 'artist/model' };
-      const originalParameters = { model: 'selected/model', temperature: 0.3, promptPrefix: 'Instructions' };
+      const originalParameters = {
+        model: 'selected/model',
+        temperature: 0.3,
+        promptPrefix: 'Instructions',
+      };
       const client = Object.create(AgentClient.prototype);
       client.options = {
         endpoint: 'OpenRouter',
         agent: { id: 'artist-id' },
         req: {
           cookies: { developing: '1' },
-          body: { endpoint: 'OpenRouter', image_generation_direct: true,
-            endpointOption: { model_parameters: artistParameters } },
+          body: {
+            endpoint: 'OpenRouter',
+            image_generation_direct: true,
+            endpointOption: { model_parameters: artistParameters },
+          },
           imageGenerationConversationParameters: originalParameters,
           imageGenerationConversationSpec: 'my-spec',
           resolvedConversation: { agent_id: 'original-id' },
         },
       };
       const saved = client.getSaveOptions();
-      expect(saved).toMatchObject({ ...originalParameters, spec: 'my-spec', agent_id: 'original-id' });
+      expect(saved).toMatchObject({
+        ...originalParameters,
+        spec: 'my-spec',
+        agent_id: 'original-id',
+      });
       expect(artistParameters).toEqual({ model: 'artist/model' });
     });
 
     it('builds a prompt from only the latest text, excluding history and attachments', async () => {
       const client = Object.create(AgentClient.prototype);
-      client.options = { req: { cookies: { developing: '1' }, body: {
-        endpoint: 'OpenRouter', image_generation_direct: true,
-      } }, agent: { id: 'artist' } };
+      client.options = {
+        req: {
+          cookies: { developing: '1' },
+          body: {
+            endpoint: 'OpenRouter',
+            image_generation_direct: true,
+          },
+        },
+        agent: { id: 'artist' },
+      };
       const ordered = jest.spyOn(AgentClient, 'getMessagesForConversation').mockReturnValue([
         { messageId: 'old', text: 'Old context', isCreatedByUser: true },
-        { messageId: 'current', text: 'A cat', isCreatedByUser: true, fileContext: 'Attachment contents' },
+        {
+          messageId: 'current',
+          text: 'A cat',
+          isCreatedByUser: true,
+          fileContext: 'Attachment contents',
+        },
       ]);
       try {
         const result = await client.buildMessages([], 'current');

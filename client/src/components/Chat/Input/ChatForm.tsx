@@ -1,8 +1,8 @@
 import { memo, useRef, useMemo, useEffect, useState, useCallback } from 'react';
-import usePrototypeAvailability from '~/hooks/Prototype/usePrototypeAvailability';
 import { useWatch } from 'react-hook-form';
 import { TextareaAutosize } from '@librechat/client';
 import { useRecoilState, useRecoilValue } from 'recoil';
+import { useGetModelCapabilitiesQuery } from 'librechat-data-provider/react-query';
 import {
   Constants,
   FileSources,
@@ -27,12 +27,14 @@ import {
   useAddedChatContext,
   useAssistantsMapContext,
 } from '~/Providers';
+import usePrototypeAvailability from '~/hooks/Prototype/usePrototypeAvailability';
+import { getSavedImageModel, useImageModels } from '~/hooks/useImageModels';
 import PendingManualSkillsChips from './PendingManualSkillsChips';
-import { cn, getModelSpec, removeFocusRings } from '~/utils';
-import { useGetStartupConfig } from '~/data-provider';
-import { useGetModelCapabilitiesQuery } from 'librechat-data-provider/react-query';
 import { imageModeAvailability } from './imageModeAvailability';
+import { cn, getModelSpec, removeFocusRings } from '~/utils';
 import ImageGenerateButton from './ImageGenerateButton';
+import { useGetStartupConfig } from '~/data-provider';
+import { useAuthContext } from '~/hooks/AuthContext';
 import { mainTextareaId, BadgeItem } from '~/common';
 import PendingQuoteChips from './PendingQuoteChips';
 import AttachFileChat from './Files/AttachFileChat';
@@ -112,6 +114,11 @@ const ChatForm = memo(function ChatForm({
   } = useAddedChatContext();
   const assistantMap = useAssistantsMapContext();
   const { data: startupConfig } = useGetStartupConfig();
+  const { user } = useAuthContext();
+  const { data: imageModels } = useImageModels(user?.id);
+  const savedImageModel = getSavedImageModel(user?.id);
+  const imageModel =
+    imageModels?.models.find((item) => item.id === savedImageModel) ?? imageModels?.models[0];
   const { data: modelCapabilities } = useGetModelCapabilitiesQuery({
     refetchOnMount: 'always',
     enabled: (conversation?.endpoint as string | null | undefined) === 'OpenRouter',
@@ -437,9 +444,11 @@ const ChatForm = memo(function ChatForm({
                 eligible={imageModeStatus.eligible}
                 text={textValue}
                 disabled={disableInputs || isSubmitting || prototypeMode || isNotAppendable}
-                model={startupConfig?.openrouterImage?.model ?? 'google/gemini-2.5-flash-image'}
-                description={startupConfig?.openrouterImage?.description ?? 'Google Gemini 2.5 Flash Image: создаёт изображения по тексту'}
-                onGenerate={() => { void methods.handleSubmit(submitImage)(); }}
+                model={imageModel?.name ?? '—'}
+                description={''}
+                onGenerate={() => {
+                  void methods.handleSubmit(submitImage)();
+                }}
               />
               <TokenUsage index={index} conversation={conversation} isSubmitting={isSubmitting} />
               {SpeechToText && (

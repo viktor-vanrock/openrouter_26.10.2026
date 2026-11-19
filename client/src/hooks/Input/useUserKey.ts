@@ -57,8 +57,10 @@ const useUserKey = (endpoint: string) => {
         },
         {
           onSuccess: () => {
-            if (keyName === 'OpenRouter')
+            if (keyName === 'OpenRouter') {
               void queryClient.invalidateQueries(['openrouter', 'model-prices']);
+              void queryClient.invalidateQueries(['openrouter', 'image-models']);
+            }
             options?.onSuccess?.();
           },
           onError: options?.onError,

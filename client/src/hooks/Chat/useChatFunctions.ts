@@ -3,6 +3,7 @@ import { cloneDeep } from 'lodash';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSetRecoilState, useRecoilValue, useRecoilCallback } from 'recoil';
+import { useGetModelCapabilitiesQuery } from 'librechat-data-provider/react-query';
 import {
   Constants,
   QueryKeys,
@@ -17,7 +18,6 @@ import {
   isImageOutputCapableModel,
   isToolsCapableModel,
 } from 'librechat-data-provider';
-import { useGetModelCapabilitiesQuery } from 'librechat-data-provider/react-query';
 import type {
   TMessage,
   TSubmission,
@@ -38,6 +38,7 @@ import {
 import useFocusRegeneratedResponse from '~/hooks/Chat/useFocusRegeneratedResponse';
 import useSetFilesToDelete from '~/hooks/Files/useSetFilesToDelete';
 import useGetSender from '~/hooks/Conversations/useGetSender';
+import { getSavedImageModel } from '~/hooks/useImageModels';
 import store, { useGetEphemeralAgent } from '~/store';
 import { startupConfigKey } from '~/data-provider';
 import useUserKey from '~/hooks/Input/useUserKey';
@@ -458,13 +459,17 @@ export default function useChatFunctions({
     const selectedModelInfo = (modelCapabilities?.[endpoint ?? ''] ?? []).find(
       (item) => item.id === convo?.model,
     );
-    const submissionEphemeralAgent = endpoint === 'OpenRouter'
-      ? {
-          ...ephemeralAgent,
-          image_generation: !directImage && selectedModelInfo != null &&
-            !isImageOutputCapableModel(selectedModelInfo) && isToolsCapableModel(selectedModelInfo),
-        }
-      : ephemeralAgent;
+    const submissionEphemeralAgent =
+      endpoint === 'OpenRouter'
+        ? {
+            ...ephemeralAgent,
+            image_generation:
+              !directImage &&
+              selectedModelInfo != null &&
+              !isImageOutputCapableModel(selectedModelInfo) &&
+              isToolsCapableModel(selectedModelInfo),
+          }
+        : ephemeralAgent;
     if (endpoint !== EModelEndpoint.agents) {
       endpointOption.key = getExpiry();
       endpointOption.thread_id = thread_id;
@@ -639,6 +644,7 @@ export default function useChatFunctions({
       isTemporary,
       ephemeralAgent: submissionEphemeralAgent,
       ...(directImage ? { image_generation_direct: true } : {}),
+      ...(endpoint === 'OpenRouter' ? { imageModel: getSavedImageModel(user?.id) } : {}),
       editedContent,
       addedConvo,
       manualSkills: manualSkills.length > 0 ? manualSkills : undefined,

@@ -72,7 +72,11 @@ jest.mock('~/config', () => ({
 
 const { initializeClient } = require('~/server/services/Endpoints/agents');
 
-async function startFakeOpenAI({ noToolCall = false, nativeImage = false, toolName = 'create_prototype' } = {}) {
+async function startFakeOpenAI({
+  noToolCall = false,
+  nativeImage = false,
+  toolName = 'create_prototype',
+} = {}) {
   const requests = [];
   const server = http.createServer(async (req, res) => {
     let rawBody = '';
@@ -95,34 +99,45 @@ async function startFakeOpenAI({ noToolCall = false, nativeImage = false, toolNa
 
     if (nativeImage && body.stream) {
       res.writeHead(200, { 'content-type': 'text/event-stream' });
-      const common = { id: 'chatcmpl_stream', object: 'chat.completion.chunk', created: 1, model: 'resolved-model' };
+      const common = {
+        id: 'chatcmpl_stream',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'resolved-model',
+      };
       const image = { type: 'image_url', image_url: { url: 'data:image/png;base64,aGVsbG8=' } };
-      res.write(`data: ${JSON.stringify({ ...common, choices: [{ index: 0, delta: { role: 'assistant', images: [image] }, finish_reason: null }] })}\n\n`);
-      res.write(`data: ${JSON.stringify({ ...common, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({ ...common, choices: [{ index: 0, delta: { role: 'assistant', images: [image] }, finish_reason: null }] })}\n\n`,
+      );
+      res.write(
+        `data: ${JSON.stringify({ ...common, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`,
+      );
       res.end('data: [DONE]\n\n');
       return;
     }
 
-    const message = nativeImage
-      ? { role: 'assistant', content: null, images: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,aGVsbG8=' } }] }
-      : noToolCall
-      ? { role: 'assistant', content: 'Ready.' }
-      : requests.length === 1
-        ? {
-            role: 'assistant',
-            content: null,
-            tool_calls: [
-              {
-                id: 'call_1',
-                type: 'function',
-                function:
-                  toolName === 'openrouter_image_gen'
-                    ? { name: toolName, arguments: '{"prompt":"a tiger"}' }
-                    : { name: toolName, arguments: '{"spec":"CRM"}' },
-              },
-            ],
-          }
-        : { role: 'assistant', content: 'Prototype accepted.' };
+    let message;
+    if (nativeImage) {
+      message = {
+        role: 'assistant',
+        content: null,
+        images: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,aGVsbG8=' } }],
+      };
+    } else if (noToolCall) {
+      message = { role: 'assistant', content: 'Ready.' };
+    } else if (requests.length === 1) {
+      const toolFunction =
+        toolName === 'openrouter_image_gen'
+          ? { name: toolName, arguments: '{"prompt":"a tiger"}' }
+          : { name: toolName, arguments: '{"spec":"CRM"}' };
+      message = {
+        role: 'assistant',
+        content: null,
+        tool_calls: [{ id: 'call_1', type: 'function', function: toolFunction }],
+      };
+    } else {
+      message = { role: 'assistant', content: 'Prototype accepted.' };
+    }
 
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(
@@ -135,7 +150,8 @@ async function startFakeOpenAI({ noToolCall = false, nativeImage = false, toolNa
           {
             index: 0,
             message,
-            finish_reason: !noToolCall && !nativeImage && requests.length === 1 ? 'tool_calls' : 'stop',
+            finish_reason:
+              !noToolCall && !nativeImage && requests.length === 1 ? 'tool_calls' : 'stop',
           },
         ],
         usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
@@ -175,53 +191,90 @@ describe('OpenRouter image generation on an ordinary chat', () => {
     }
   });
 
-  it('uses the configured artist and sends only the current message in direct mode', async () => {
+  it('uses the selected artist and saves the image in direct mode', async () => {
     process.env.OPENROUTER_IMAGE_MODEL = 'resolved-model';
     fake = await startFakeOpenAI({ nativeImage: true });
     const req = {
       user: { id: 'user_1', tenantId: 'tenant_1' },
-      body: { conversationId: 'conversation_1', messageId: 'message_1', model: 'selected-model',
-        endpoint: 'OpenRouter', image_generation_direct: true },
-      config: { endpoints: {
-        agents: { allowedProviders: ['OpenRouter'], capabilities: [AgentCapabilities.tools] },
-        custom: [{ name: 'OpenRouter', apiKey: 'local-fake-key', baseURL: fake.baseURL,
-          models: { default: ['resolved-model', 'selected-model'], fetch: false } }],
-      } },
+      body: {
+        conversationId: 'conversation_1',
+        messageId: 'message_1',
+        model: 'selected-model',
+        endpoint: 'OpenRouter',
+        image_generation_direct: true,
+      },
+      config: {
+        endpoints: {
+          agents: { allowedProviders: ['OpenRouter'], capabilities: [AgentCapabilities.tools] },
+          custom: [
+            {
+              name: 'OpenRouter',
+              apiKey: 'local-fake-key',
+              baseURL: fake.baseURL,
+              models: { default: ['resolved-model', 'selected-model'], fetch: false },
+            },
+          ],
+        },
+      },
     };
     const res = { write: jest.fn(), end: jest.fn(), headersSent: false };
     const endpointOption = require('~/server/services/Endpoints/agents').buildOptions(
-      req, 'OpenRouter', { model: 'selected-model', streaming: true }, 'custom',
+      req,
+      'OpenRouter',
+      { model: 'selected-model', streaming: true },
+      'custom',
     );
-    const { client } = await initializeClient({ req, res, signal: new AbortController().signal, endpointOption });
+    const { client } = await initializeClient({
+      req,
+      res,
+      signal: new AbortController().signal,
+      endpointOption,
+    });
     client.conversationId = req.body.conversationId;
     client.responseMessageId = req.body.messageId;
     client.parentMessageId = 'parent_1';
     client.user = req.user.id;
     client.indexTokenCountMap = { 0: 8 };
-    await client.chatCompletion({ payload: [{ role: 'user', content: 'Draw a tiger.' }] });
-    expect(fake.requests).toHaveLength(1);
-    expect(fake.requests[0].body.model).toBe('resolved-model');
-    expect(fake.requests[0].body.modalities).toEqual(['image', 'text']);
-    expect(fake.requests[0].body.messages).toHaveLength(1);
-    expect(fake.requests[0].body.messages[0].role).toBe('user');
-    expect(fake.requests[0].body.messages[0].content).toEqual(
-      expect.arrayContaining([expect.objectContaining({ type: 'text', text: 'Draw a tiger.' })]),
+    const imageService = require('~/server/services/Images/openrouter');
+    const generate = jest.spyOn(imageService, 'generateImage').mockResolvedValue({
+      model: 'resolved-model',
+      url: 'data:image/png;base64,aGVsbG8=',
+    });
+    await client.sendCompletion([{ role: 'user', content: 'Draw a tiger.' }]);
+    expect(generate).toHaveBeenCalledWith(
+      expect.objectContaining({ req, prompt: 'Draw a tiger.' }),
     );
-    expect(await Promise.all(client.artifactPromises)).toEqual([expect.objectContaining({ file_id: 'saved_image' })]);
+    expect(client.model).toBe('resolved-model');
+    expect(await Promise.all(client.artifactPromises)).toEqual([
+      expect.objectContaining({ file_id: 'saved_image' }),
+    ]);
   });
 
   it('still requires endpoint configuration for an image tool call', async () => {
     const OpenRouterImageGen = require('~/app/clients/tools/structured/OpenRouterImageGen');
     const tool = new OpenRouterImageGen({ req: { cookies: {} }, userId: 'user_1', model: 'model' });
-    await expect(tool._call({ prompt: 'A tiger' })).rejects.toThrow('image generation is not configured');
+    await expect(tool._call({ prompt: 'A tiger' })).resolves.toEqual([
+      expect.arrayContaining([
+        expect.objectContaining({ text: 'Извините, не удалось сгенерировать изображение' }),
+      ]),
+      {},
+    ]);
   });
 
   it('adds the selected OpenRouter image tool without the developing cookie', async () => {
-    const agent = await mockApi.loadEphemeralAgent({
-      req: { user: { id: 'user_1' }, cookies: {}, body: { ephemeralAgent: { image_generation: true } },
-        config: { endpoints: { custom: [] } } },
-      endpoint: 'OpenRouter', model_parameters: { model: 'model' },
-    }, { getAgent: jest.fn(), getMCPServerTools: jest.fn() });
+    const agent = await mockApi.loadEphemeralAgent(
+      {
+        req: {
+          user: { id: 'user_1' },
+          cookies: {},
+          body: { ephemeralAgent: { image_generation: true } },
+          config: { endpoints: { custom: [] } },
+        },
+        endpoint: 'OpenRouter',
+        model_parameters: { model: 'model' },
+      },
+      { getAgent: jest.fn(), getMCPServerTools: jest.fn() },
+    );
     expect(agent.tools).toContain('openrouter_image_gen');
     expect(agent.instructions ?? '').toContain('openrouter_image_gen');
   });
@@ -363,9 +416,12 @@ describe('OpenRouter image generation on an ordinary chat', () => {
     expect(loggedErrors).toEqual([]);
     expect(fake.requests).toHaveLength(1);
     expect(require('~/server/services/Files/process').saveBase64Image).toHaveBeenCalledWith(
-      'data:image/png;base64,aGVsbG8=', expect.objectContaining({ req }),
+      'data:image/png;base64,aGVsbG8=',
+      expect.objectContaining({ req }),
     );
-    expect(await Promise.all(client.artifactPromises)).toEqual([expect.objectContaining({ file_id: 'saved_image' })]);
+    expect(await Promise.all(client.artifactPromises)).toEqual([
+      expect.objectContaining({ file_id: 'saved_image' }),
+    ]);
   });
 
   it('saves a native OpenRouter image returned over a stream', async () => {
@@ -428,14 +484,19 @@ describe('OpenRouter image generation on an ordinary chat', () => {
     expect(loggedErrors).toEqual([]);
     expect(fake.requests).toHaveLength(1);
     expect(require('~/server/services/Files/process').saveBase64Image).toHaveBeenCalledWith(
-      'data:image/png;base64,aGVsbG8=', expect.objectContaining({ req }),
+      'data:image/png;base64,aGVsbG8=',
+      expect.objectContaining({ req }),
     );
-    expect(await Promise.all(client.artifactPromises)).toEqual([expect.objectContaining({ file_id: 'saved_image' })]);
+    expect(await Promise.all(client.artifactPromises)).toEqual([
+      expect.objectContaining({ file_id: 'saved_image' }),
+    ]);
   });
 
   it('reports a streamed OpenRouter image save failure in the response', async () => {
     fake = await startFakeOpenAI({ nativeImage: true });
-    require('~/server/services/Files/process').saveBase64Image.mockRejectedValueOnce(Object.assign(new Error('denied'), { code: 'EACCES' }));
+    require('~/server/services/Files/process').saveBase64Image.mockRejectedValueOnce(
+      Object.assign(new Error('denied'), { code: 'EACCES' }),
+    );
     const req = {
       user: { id: 'user_1', tenantId: 'tenant_1' },
       body: {
@@ -495,10 +556,13 @@ describe('OpenRouter image generation on an ordinary chat', () => {
       ],
     });
 
-    expect(loggedErrors.some((entry) => entry.includes('[OpenRouter image] save failed'))).toBe(true);
+    expect(loggedErrors.some((entry) => entry.includes('[OpenRouter image] save failed'))).toBe(
+      true,
+    );
     expect(fake.requests).toHaveLength(1);
     expect(require('~/server/services/Files/process').saveBase64Image).toHaveBeenCalledWith(
-      'data:image/png;base64,aGVsbG8=', expect.objectContaining({ req }),
+      'data:image/png;base64,aGVsbG8=',
+      expect.objectContaining({ req }),
     );
     const { initializeFakeClient } = require('~/app/clients/specs/FakeClient');
     const replyClient = initializeFakeClient('fake', { req }, []);
@@ -508,14 +572,28 @@ describe('OpenRouter image generation on an ordinary chat', () => {
     expect(response.text).toContain('Изображение создано, но не удалось его сохранить');
     expect(response.attachments).toEqual([]);
     expect(replyClient.saveMessageToDatabase).toHaveBeenCalledWith(
-      expect.objectContaining({ text: expect.stringContaining('Изображение создано, но не удалось его сохранить') }),
-      expect.anything(), null,
+      expect.objectContaining({
+        text: expect.stringContaining('Изображение создано, но не удалось его сохранить'),
+      }),
+      expect.anything(),
+      null,
     );
   });
 
   it('executes an image tool call using the user key and attaches the returned image', async () => {
     fake = await startFakeOpenAI({ toolName: 'openrouter_image_gen' });
     const axios = require('axios');
+    jest.spyOn(axios, 'get').mockResolvedValue({
+      data: {
+        data: [
+          {
+            id: 'test/image',
+            architecture: { output_modalities: ['image', 'text'] },
+            pricing: { image: '0.1' },
+          },
+        ],
+      },
+    });
     const imageRequest = jest.spyOn(axios, 'post').mockResolvedValue({
       data: {
         choices: [
@@ -586,12 +664,14 @@ describe('OpenRouter image generation on an ordinary chat', () => {
     expect(imageRequest).toHaveBeenCalledWith(
       'https://openrouter.example/v1/chat/completions',
       expect.objectContaining({
-        model: 'google/gemini-2.5-flash-image',
+        model: 'test/image',
         messages: [{ role: 'user', content: 'a tiger' }],
         modalities: ['image', 'text'],
         stream: false,
       }),
-      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer user-openrouter-key' }) }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer user-openrouter-key' }),
+      }),
     );
     expect(require('~/server/services/Files/process').saveBase64Image).toHaveBeenCalledWith(
       'data:image/png;base64,aGVsbG8=',

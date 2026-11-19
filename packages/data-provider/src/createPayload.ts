@@ -23,6 +23,7 @@ export default function createPayload(submission: t.TSubmission) {
     editedContent,
     ephemeralAgent,
     image_generation_direct,
+    imageModel,
     endpointOption,
     manualSkills,
   } = submission;
@@ -51,6 +52,7 @@ export default function createPayload(submission: t.TSubmission) {
     conversationId,
     isContinued: !!(isEdited && isContinued),
     ephemeralAgent: s.isAssistantsEndpoint(endpoint) ? undefined : ephemeralAgent,
+    ...(imageModel ? { imageModel } : {}),
     ...(image_generation_direct === true ? { image_generation_direct: true } : {}),
     manualSkills: s.isAssistantsEndpoint(endpoint) ? undefined : manualSkills,
     timezone: getUserTimezone(),

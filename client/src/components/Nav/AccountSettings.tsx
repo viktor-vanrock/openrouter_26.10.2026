@@ -1,7 +1,7 @@
 import { useState, memo, useRef } from 'react';
 import { useSetRecoilState } from 'recoil';
 import * as Menu from '@ariakit/react/menu';
-import { GearIcon, DropdownMenuSeparator, Avatar } from '@librechat/client';
+import { GearIcon, DropdownMenuSeparator } from '@librechat/client';
 import {
   Archive,
   ChevronRight,
@@ -18,8 +18,8 @@ import { MyFilesModal } from '~/components/Chat/Input/Files/MyFilesModal';
 import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { hasDevelopingCookie } from '~/utils/developingCookie';
 import { useAuthContext } from '~/hooks/AuthContext';
+import ImageSettings from './ImageSettings';
 import { useLocalize } from '~/hooks';
-import Settings from './Settings';
 import store from '~/store';
 
 function HelpSubmenu({
@@ -173,14 +173,14 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
           <Archive className="icon-md" aria-hidden="true" />
           {localize('com_nav_archived_chats')}
         </Menu.MenuItem>
-        {/* <Menu.MenuItem
+        <Menu.MenuItem
           onClick={() => setShowSettings(true)}
           className="select-item text-sm"
           data-testid="nav-settings"
         >
           <GearIcon className="icon-md" aria-hidden="true" />
           {localize('com_nav_settings')}
-        </Menu.MenuItem>  Настройки закомичены пока нет полных требований */}
+        </Menu.MenuItem>
         <DropdownMenuSeparator />
         <Menu.MenuItem onClick={() => logout()} className="select-item text-sm">
           <LogOut className="icon-md" aria-hidden="true" />
@@ -201,7 +201,7 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
           triggerRef={accountSettingsButtonRef}
         />
       )}
-      {showSettings && <Settings open={showSettings} onOpenChange={setShowSettings} />}
+      {showSettings && <ImageSettings open={showSettings} onOpenChange={setShowSettings} />}
     </Menu.MenuProvider>
   );
 }

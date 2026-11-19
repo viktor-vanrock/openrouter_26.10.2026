@@ -963,6 +963,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     collectedThoughtSignatures,
     aggregateContent,
     artifactPromises,
+    directImageCallback: toolEndCallback,
     primeInvokedSkills: handlePrimeInvokedSkills,
     agent: primaryConfig,
     spec: endpointOption.spec,
