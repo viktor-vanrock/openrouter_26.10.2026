@@ -295,6 +295,25 @@ async function processRequiredActions(client, requiredActions) {
       const toolCallIndex = client.mappedOrder.get(toolCall.id);
 
       if (imageGenTools.has(currentAction.tool)) {
+        if (
+          output?.tool_call_id === currentAction.toolCallId &&
+          typeof output.output === 'string'
+        ) {
+          /** A caught tool exception has the same envelope as a tool response, but no image. */
+          requiredActions[i].output = output.output;
+          toolCall.function.output = output.output;
+          client.seenToolCalls && client.seenToolCalls.set(toolCall.id, toolCall);
+          client.addContentData({
+            [ContentTypes.TOOL_CALL]: toolCall,
+            index: toolCallIndex,
+            type: ContentTypes.TOOL_CALL,
+          });
+          return {
+            tool_call_id: currentAction.toolCallId,
+            output: output.output,
+          };
+        }
+
         const imageOutput = output;
         toolCall.function.output = `${currentAction.tool} displayed an image. All generated images are already plainly visible, so don't repeat the descriptions in detail. Do not list download links as they are available in the UI already. The user may download the images by clicking on them, but do not mention anything about downloading to the user.`;
 

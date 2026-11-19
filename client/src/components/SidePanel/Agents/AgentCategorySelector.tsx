@@ -84,7 +84,9 @@ const AgentCategorySelector: React.FC<{ className?: string }> = ({ className }) 
               field.onChange(value);
             }}
             items={comboboxItems}
-            listClassName="space-y-1"
+            popoverClassName="p-1.5 shadow-xl"
+            listClassName="gap-1"
+            itemClassName="min-h-11 rounded-lg px-3 py-2.5 transition-colors"
             className={cn(className)}
             ariaLabel={ariaLabel}
             isCollapsed={false}

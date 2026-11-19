@@ -147,7 +147,8 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
    *      `agent.skills` allowlist narrows the catalog; empty/undefined
    *      allowlist with the toggle on = full accessible catalog. */
   const enabledCapabilities = new Set(appConfig?.endpoints?.[EModelEndpoint.agents]?.capabilities);
-  const skillsCapabilityEnabled = !isDirectImageRequest(req) && enabledCapabilities.has(AgentCapabilities.skills);
+  const skillsCapabilityEnabled =
+    !isDirectImageRequest(req) && enabledCapabilities.has(AgentCapabilities.skills);
   const codeEnvAvailable = enabledCapabilities.has(AgentCapabilities.execute_code);
   const ephemeralSkillsToggle = req.body?.ephemeralAgent?.skills === true;
   const skillDbMethods = getSkillDbMethods();
@@ -272,6 +273,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     aggregateContent,
     toolEndCallback,
     nativeImageCallback: req.body?.endpoint === 'OpenRouter' ? toolEndCallback : null,
+    expectImage: isDirectImageRequest(req),
     collectedUsage,
     collectedThoughtSignatures,
     streamId,

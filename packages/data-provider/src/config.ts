@@ -1700,7 +1700,9 @@ export const prototypeAgentSchema = z
       )
       .default({}),
     redisStreamPrefix: z.string().min(1).default('prototype'),
-    storage: z.object({ driver: z.enum(['pvc', 's3']).default('pvc'), root: z.string().min(1) }).strict(),
+    storage: z
+      .object({ driver: z.enum(['pvc', 's3']).default('pvc'), root: z.string().min(1) })
+      .strict(),
     preview: z
       .object({
         origin: z.string().url(),
@@ -2408,6 +2410,8 @@ export enum ErrorTypes {
    * Model refused to respond (content policy violation)
    */
   REFUSAL = 'refusal',
+  /** The direct image-generation endpoint completed without returning an image. */
+  IMAGE_GENERATION_FAILED = 'image_generation_failed',
   /**
    * SSE stream 404 — job completed, expired, or was deleted before the subscriber connected
    */

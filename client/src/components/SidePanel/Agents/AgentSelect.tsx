@@ -1,6 +1,6 @@
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { EarthIcon } from 'lucide-react';
 import { ControlCombobox } from '@librechat/client';
-import { memo, useCallback, useEffect, useRef } from 'react';
 import { useFormContext, Controller } from 'react-hook-form';
 import { AgentCapabilities, defaultAgentFormValues } from 'librechat-data-provider';
 import type { UseMutationResult, QueryObserverResult } from '@tanstack/react-query';
@@ -217,7 +217,9 @@ function AgentSelect({
           selectedValue={(field?.value?.value ?? '') + ''}
           displayValue={field?.value?.label ?? ''}
           selectPlaceholder={field?.value?.value ?? createAgent}
-          listClassName="space-y-1"
+          popoverClassName="p-1.5 shadow-xl"
+          listClassName="gap-1"
+          itemClassName="min-h-11 rounded-lg px-3 py-2.5 transition-colors"
           iconSide="right"
           searchPlaceholder={localize('com_agents_search_name')}
           SelectIcon={field?.value?.icon}
