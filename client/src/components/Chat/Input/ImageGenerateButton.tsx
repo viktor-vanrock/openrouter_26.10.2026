@@ -1,5 +1,6 @@
 import { ImagePlus } from 'lucide-react';
 import { TooltipAnchor } from '@librechat/client';
+import { useLocalize } from '~/hooks';
 
 export default function ImageGenerateButton({
   eligible,
@@ -16,20 +17,22 @@ export default function ImageGenerateButton({
   description: string;
   onGenerate: () => void;
 }) {
+  const localize = useLocalize();
+  const label = localize('com_image_generate');
   if (!eligible) return null;
   return (
     <TooltipAnchor
-      description={`Сгенерировать изображение — ${model} — ${description}`}
+      description={[label, model, description].filter(Boolean).join(' — ')}
       render={
         <button
           type="button"
-          aria-label="Сгенерировать изображение"
+          aria-label={label}
           disabled={disabled || !text?.trim()}
           onClick={onGenerate}
           className="flex h-9 items-center gap-1.5 rounded-lg border border-border-light px-2 text-xs font-medium text-text-secondary transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ImagePlus className="size-4" aria-hidden="true" />
-          Сгенерировать изображение
+          {label}
         </button>
       }
     />

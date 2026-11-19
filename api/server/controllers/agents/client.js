@@ -83,7 +83,9 @@ const { getMCPServerTools } = require('~/server/services/Config');
 const BaseClient = require('~/app/clients/BaseClient');
 const { getMCPManager } = require('~/config');
 const db = require('~/models');
-const { isDirectImageRequest } = require('~/server/services/Endpoints/agents/openrouterImageConfig');
+const {
+  isDirectImageRequest,
+} = require('~/server/services/Endpoints/agents/openrouterImageConfig');
 
 const loadAgent = (params) => loadAgentFn(params, { getAgent: db.getAgent, getMCPServerTools });
 
@@ -235,9 +237,11 @@ class AgentClient extends BaseClient {
     const directImage = isDirectImageRequest(this.options.req);
     let runOptions = {};
     try {
-      runOptions = { ...(directImage
-        ? this.options.req.imageGenerationConversationParameters
-        : payloadParser(this.options)) };
+      runOptions = {
+        ...(directImage
+          ? this.options.req.imageGenerationConversationParameters
+          : payloadParser(this.options)),
+      };
     } catch (error) {
       logger.error(
         '[api/server/controllers/agents/client.js #getSaveOptions] Error parsing options',
@@ -911,6 +915,56 @@ class AgentClient extends BaseClient {
 
   /** @type {sendCompletion} */
   async sendCompletion(payload, opts = {}) {
+    if (isDirectImageRequest(this.options.req)) {
+      const { generateImage, FAILURE } = require('~/server/services/Images/openrouter');
+      const last = payload[payload.length - 1];
+      const prompt = typeof last?.content === 'string' ? last.content : (last?.text ?? '');
+      const result = await generateImage({
+        req: this.options.req,
+        prompt,
+        signal: opts.abortController?.signal,
+        onUsage: (usage, model) => {
+          this.collectedUsage.push({
+            input_tokens: usage.prompt_tokens ?? 0,
+            output_tokens: usage.completion_tokens ?? 0,
+            total_tokens: usage.total_tokens ?? 0,
+            model,
+            provider: 'OpenRouter',
+          });
+        },
+      });
+      if (!opts.abortController?.signal?.aborted && this.collectedUsage.length) {
+        try {
+          await this.recordCollectedUsage({
+            balance: getBalanceConfig(this.options.req.config),
+            transactions: getTransactionsConfig(this.options.req.config),
+          });
+        } catch (error) {
+          logger.error('[OpenRouter image] Failed to record usage', error);
+        }
+      }
+      if (result) {
+        this.model = result.model;
+        await this.options.directImageCallback(
+          {
+            output: {
+              name: 'openrouter',
+              artifact: {
+                content: [{ type: 'image_url', image_url: { url: result.url } }],
+              },
+            },
+          },
+          {
+            run_id: this.responseMessageId,
+            thread_id: this.conversationId,
+            provider: 'OpenRouter',
+          },
+        );
+        return { completion: [{ type: ContentTypes.TEXT, text: '' }] };
+      }
+      if (opts.abortController?.signal?.aborted) return { completion: [] };
+      return { completion: [{ type: ContentTypes.ERROR, [ContentTypes.ERROR]: FAILURE }] };
+    }
     await this.chatCompletion({
       payload,
       onProgress: opts.onProgress,
@@ -1262,7 +1316,9 @@ class AgentClient extends BaseClient {
         formatOptions,
       );
       if (isDirectImageRequest(this.options.req)) {
-        initialMessages = initialMessages.filter((message) => message._getType() === 'human').slice(-1);
+        initialMessages = initialMessages
+          .filter((message) => message._getType() === 'human')
+          .slice(-1);
         this.options.agent.instructions = undefined;
         this.options.agent.additional_instructions = undefined;
       }
@@ -1628,6 +1684,7 @@ class AgentClient extends BaseClient {
    *   title derives from the user's input only (`contentParts` is empty).
    */
   async titleConvo({ text, abortController, immediate = false }) {
+    if (isDirectImageRequest(this.options.req)) return sanitizeTitle(text);
     if (!this.run) {
       if (!immediate) {
         throw new Error('Run not initialized');

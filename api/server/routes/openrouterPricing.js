@@ -21,6 +21,24 @@ function decodeResponse(response) {
   return JSON.parse(bytes.toString('utf8'));
 }
 
+router.get('/image-models', async (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  try {
+    req.config = await getAppConfig({
+      role: req.user.role,
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+    });
+    const { getImageModels } = require('~/server/services/Images/openrouter');
+    const models = await getImageModels(req);
+    return res.json({ models, defaultModel: models[0]?.id ?? null });
+  } catch {
+    return res
+      .status(502)
+      .json({ message: 'Не удалось загрузить модели для генерации изображений' });
+  }
+});
+
 router.get('/pricing', async (req, res) => {
   res.set('Cache-Control', 'private, no-store');
   try {

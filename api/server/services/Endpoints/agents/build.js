@@ -3,16 +3,14 @@ const { loadAgent: loadAgentFn } = require('@librechat/api');
 const { isAgentsEndpoint, removeNullishValues, Constants } = require('librechat-data-provider');
 const { getMCPServerTools } = require('~/server/services/Config');
 const db = require('~/models');
-const { getOpenRouterImageConfig, isDirectImageRequest } = require('./openrouterImageConfig');
+const { isDirectImageRequest } = require('./openrouterImageConfig');
 
 const loadAgent = (params) => loadAgentFn(params, { getAgent: db.getAgent, getMCPServerTools });
 
 const buildOptions = (req, endpoint, parsedBody, endpointType) => {
   const { spec, iconURL, agent_id, chatProjectId, ...parsedParameters } = parsedBody;
   const directImage = isDirectImageRequest(req);
-  const model_parameters = directImage
-    ? { model: getOpenRouterImageConfig().model }
-    : parsedParameters;
+  const model_parameters = parsedParameters;
   if (directImage) {
     req.imageGenerationConversationParameters = { ...parsedParameters };
     req.imageGenerationConversationSpec = spec;

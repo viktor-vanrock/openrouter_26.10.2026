@@ -2,7 +2,7 @@ const axios = require('axios');
 const { getUserKeyValues } = require('~/models');
 const OpenRouterImageGen = require('../OpenRouterImageGen');
 
-jest.mock('axios', () => ({ post: jest.fn() }));
+jest.mock('axios', () => ({ get: jest.fn(), post: jest.fn() }));
 jest.mock('~/models', () => ({ getUserKeyValues: jest.fn() }));
 
 const image = 'data:image/png;base64,aGVsbG8=';
@@ -12,6 +12,7 @@ function tool(endpoint, cookies = { developing: '1' }) {
     userId: 'test-user',
     req: {
       cookies,
+      user: { id: 'test-user' },
       config: { endpoints: { custom: [{ name: 'OpenRouter', ...endpoint }] } },
     },
   });
@@ -22,6 +23,17 @@ beforeEach(() => {
   getUserKeyValues.mockResolvedValue({
     apiKey: 'user-test-key',
     baseURL: 'https://user.example/v1',
+  });
+  axios.get.mockResolvedValue({
+    data: {
+      data: [
+        {
+          id: 'test-image-model',
+          architecture: { output_modalities: ['image', 'text'] },
+          pricing: { image: '0.1' },
+        },
+      ],
+    },
   });
   axios.post.mockResolvedValue({
     data: { choices: [{ message: { images: [{ image_url: { url: image } }] } }] },
@@ -69,10 +81,17 @@ it('does not expose an Axios error containing credentials', async () => {
   const result = tool({ apiKey: 'user_provided', baseURL: 'https://server.example/v1' })._call({
     prompt: 'A cat',
   });
-  await expect(result).rejects.toThrow('Не удалось выполнить запрос на создание изображения');
+  await expect(result).resolves.toEqual([
+    expect.arrayContaining([
+      expect.objectContaining({ text: 'Извините, не удалось сгенерировать изображение' }),
+    ]),
+    {},
+  ]);
 });
 
 it('sends an image request without the cookie', async () => {
-  await tool({ apiKey: 'user_provided', baseURL: 'https://server.example/v1' }, {})._call({ prompt: 'A cat' });
+  await tool({ apiKey: 'user_provided', baseURL: 'https://server.example/v1' }, {})._call({
+    prompt: 'A cat',
+  });
   expect(axios.post).toHaveBeenCalledTimes(1);
 });
